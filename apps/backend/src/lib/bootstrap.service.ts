@@ -985,35 +985,37 @@ export async function initializeEnvironmentConfiguration(): Promise<void> {
 
   validateConfig(config);
 
-  // Registration controls (applied every run)
-  console.log("🔧 Setting registration controls...");
-  try {
-    await upsertConfig(
-      ConfigKeyEnum.Enum.DISABLE_SIGNUP,
-      config.disableUiRegistration.toString(),
-      "Whether new user signup is disabled",
-    );
-  } catch (err) {
-    console.warn("⚠️ Failed to set UI registration control:", err);
-  }
+  const applyRegistrationControls = async () => {
+    console.log("🔧 Setting registration controls...");
+    try {
+      await upsertConfig(
+        ConfigKeyEnum.Enum.DISABLE_SIGNUP,
+        config.disableUiRegistration.toString(),
+        "Whether new user signup is disabled",
+      );
+    } catch (err) {
+      console.warn("⚠️ Failed to set UI registration control:", err);
+    }
 
-  try {
-    await upsertConfig(
-      ConfigKeyEnum.Enum.DISABLE_SSO_SIGNUP,
-      config.disableSsoRegistration.toString(),
-      "Whether new user signup via SSO/OAuth is disabled",
-    );
-  } catch (err) {
-    console.warn("⚠️ Failed to set SSO registration control:", err);
-  }
+    try {
+      await upsertConfig(
+        ConfigKeyEnum.Enum.DISABLE_SSO_SIGNUP,
+        config.disableSsoRegistration.toString(),
+        "Whether new user signup via SSO/OAuth is disabled",
+      );
+    } catch (err) {
+      console.warn("⚠️ Failed to set SSO registration control:", err);
+    }
 
-  console.log(
-    `✓ Registration controls set: UI=${!config.disableUiRegistration}, SSO=${!config.disableSsoRegistration}`,
-  );
+    console.log(
+      `✓ Registration controls set: UI=${!config.disableUiRegistration}, SSO=${!config.disableSsoRegistration}`,
+    );
+  };
 
   // One-time bootstrap guard
   const skipBootstrap = await shouldSkipBootstrap(config);
   if (skipBootstrap) {
+    await applyRegistrationControls();
     console.log("✅ Environment-based configuration initialized (guarded)");
     return;
   }
@@ -1064,6 +1066,10 @@ export async function initializeEnvironmentConfiguration(): Promise<void> {
       await markBootstrapComplete();
     }
   }
+
+  // Apply registration controls after bootstrapping so initial user creation
+  // is not blocked when signup is disabled for steady-state operation.
+  await applyRegistrationControls();
 
   console.log("✅ Environment-based configuration initialized successfully");
 }
