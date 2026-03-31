@@ -34,7 +34,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { McpServerType, McpServerTypeEnum } from "@repo/zod-types";
 import { useMemoizedFn } from "ahooks";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -86,7 +86,12 @@ export function useConnection({
   includeInactiveServers = false,
   enabled = true,
 }: UseConnectionOptions) {
-  const authProvider = createAuthProvider(mcpServerUuid, url);
+  const authProvider = useMemo(
+    () => createAuthProvider(mcpServerUuid, url),
+    // Re-create only when the server identity changes, not on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mcpServerUuid, url],
+  );
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("disconnected");
   const [serverCapabilities, setServerCapabilities] =
