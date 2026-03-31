@@ -114,7 +114,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
+        platforms: linux/amd64
         push: true
         tags: ${{ steps.meta-main.outputs.tags }}
         labels: ${{ steps.meta-main.outputs.labels }}
@@ -127,7 +127,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
+        platforms: linux/amd64
         push: true
         tags: ${{ steps.meta-test.outputs.tags }}
         labels: ${{ steps.meta-test.outputs.labels }}
@@ -140,7 +140,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
+        platforms: linux/amd64
         push: true
         tags: ${{ steps.meta-docker-per-mcp.outputs.tags }}
         labels: ${{ steps.meta-docker-per-mcp.outputs.labels }}
