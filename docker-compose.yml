@@ -17,7 +17,7 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-your-super-secret-key-change-this-in-production}
       TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL: ${TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL:-true}
       NODE_ENV: ${NODE_ENV:-production}
-      LOG_LEVEL: ${LOG_LEVEL:-errors-only}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       BOOTSTRAP_ENABLE: ${BOOTSTRAP_ENABLE:-false}
       BOOTSTRAP_FAIL_HARD: ${BOOTSTRAP_FAIL_HARD:-false}
       BOOTSTRAP_DEBUG: ${BOOTSTRAP_DEBUG:-false}
