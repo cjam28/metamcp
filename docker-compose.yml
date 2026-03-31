@@ -1,7 +1,7 @@
 services:
   app:
     container_name: metamcp
-    image: ghcr.io/metatool-ai/metamcp:latest
+    image: ghcr.io/cjam28/metamcp:latest
     pull_policy: always
     ports:
       - "127.0.0.1:12008:12008"
