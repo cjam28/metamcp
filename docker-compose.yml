@@ -35,8 +35,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     restart: unless-stopped
     logging:
       driver: "json-file"
