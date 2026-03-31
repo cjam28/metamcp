@@ -149,6 +149,7 @@ jobs:
 
     - name: Generate artifact attestation for main branch
       if: steps.check-branch.outputs.on-main == 'true'
+      continue-on-error: true
       uses: actions/attest-build-provenance@v1
       with:
         subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
@@ -157,6 +158,7 @@ jobs:
 
     - name: Generate artifact attestation for test branch
       if: steps.check-branch.outputs.on-test == 'true'
+      continue-on-error: true
       uses: actions/attest-build-provenance@v1
       with:
         subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
@@ -165,6 +167,7 @@ jobs:
 
     - name: Generate artifact attestation for docker-per-mcp branch
       if: steps.check-branch.outputs.on-docker-per-mcp == 'true'
+      continue-on-error: true
       uses: actions/attest-build-provenance@v1
       with:
         subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}-docker-per-mcp
