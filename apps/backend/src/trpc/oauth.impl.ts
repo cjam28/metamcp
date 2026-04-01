@@ -1,4 +1,6 @@
 import {
+  DeleteOAuthSessionRequestSchema,
+  DeleteOAuthSessionResponseSchema,
   GetOAuthSessionRequestSchema,
   GetOAuthSessionResponseSchema,
   UpsertOAuthSessionRequestSchema,
@@ -12,6 +14,26 @@ import { oauthSessionsRepository } from "../db/repositories";
 import { OAuthSessionsSerializer } from "../db/serializers";
 
 export const oauthImplementations = {
+  delete: async (
+    input: z.infer<typeof DeleteOAuthSessionRequestSchema>,
+  ): Promise<z.infer<typeof DeleteOAuthSessionResponseSchema>> => {
+    try {
+      await oauthSessionsRepository.deleteByMcpServerUuid(
+        input.mcp_server_uuid,
+      );
+      return {
+        success: true as const,
+        message: "OAuth session deleted successfully",
+      };
+    } catch (error) {
+      logger.error("Error deleting OAuth session:", error);
+      return {
+        success: false as const,
+        message: "Failed to delete OAuth session",
+      };
+    }
+  },
+
   get: async (
     input: z.infer<typeof GetOAuthSessionRequestSchema>,
   ): Promise<z.infer<typeof GetOAuthSessionResponseSchema>> => {

@@ -46,8 +46,12 @@ export class OAuthSessionsRepository {
         ...(input.client_information && {
           client_information: input.client_information,
         }),
-        ...(input.tokens && { tokens: input.tokens }),
-        ...(input.code_verifier && { code_verifier: input.code_verifier }),
+        // Allow tokens: null to explicitly clear stored tokens (e.g. on re-authorize).
+        // The original `...(input.tokens && {...})` pattern silently ignored null.
+        ...(input.tokens !== undefined && { tokens: input.tokens }),
+        ...(input.code_verifier !== undefined && {
+          code_verifier: input.code_verifier,
+        }),
         updated_at: sql`NOW()`,
       })
       .where(eq(oauthSessionsTable.mcp_server_uuid, input.mcp_server_uuid))

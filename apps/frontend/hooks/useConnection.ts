@@ -185,6 +185,20 @@ export function useConnection({
 
         return response;
       } catch (e: unknown) {
+        // Handle 401/auth challenges on any request, not just during connect().
+        // This covers deferred auth scenarios where the server (e.g. Gusto) accepts
+        // initialize but requires auth on tools/list or other protected methods.
+        const shouldRetry = await handleAuthError(e);
+        if (shouldRetry) {
+          // Tokens were already present and valid — retry the request immediately.
+          return makeRequest(request, schema, options);
+        }
+        if (is401Error(e)) {
+          // OAuth redirect has been initiated via window.location.href — suppress
+          // the toast and rethrow so callers can clean up, but the page will
+          // navigate before the error propagates to the user.
+          throw e;
+        }
         if (!options?.suppressToast) {
           const errorString = (e as Error).message ?? String(e);
           toast.error(errorString);
@@ -289,7 +303,11 @@ export function useConnection({
         (error &&
           typeof error === "object" &&
           "status" in error &&
-          (error as { status: number }).status === 401),
+          (error as { status: number }).status === 401) ||
+        // Handle JSON-RPC auth challenge errors tagged by our proxy with -32401.
+        // McpError is the error type thrown by the MCP SDK when the server returns
+        // a JSON-RPC error response.
+        (error instanceof McpError && error.code === -32401),
     );
   });
 
@@ -685,6 +703,16 @@ export function useConnection({
     };
   }, [connectionStatus, disconnect]);
 
+  // Expose a way for UI to proactively start the OAuth flow (e.g. "Authorize" button)
+  // without needing to trigger a failed request first.
+  const triggerAuth = useMemoizedFn(async (): Promise<boolean> => {
+    if (typeof window === "undefined") return false;
+    sessionStorage.setItem(SESSION_KEYS.SERVER_URL, url || "");
+    sessionStorage.setItem(SESSION_KEYS.MCP_SERVER_UUID, mcpServerUuid);
+    const result = await auth(authProvider, { serverUrl: url || "" });
+    return result === "AUTHORIZED";
+  });
+
   return {
     connectionStatus,
     serverCapabilities,
@@ -696,5 +724,6 @@ export function useConnection({
     completionsSupported,
     connect,
     disconnect,
+    triggerAuth,
   };
 }

@@ -3,6 +3,23 @@ import { isJSONRPCRequest } from "@modelcontextprotocol/sdk/types.js";
 
 import logger from "@/utils/logger";
 
+// JSON-RPC error code used to signal downstream OAuth/auth challenges to the frontend.
+// Using -32401 (outside the standard -32700..-32000 range) so the frontend can
+// distinguish auth challenges from generic server errors (-32001).
+export const JSONRPC_AUTH_CHALLENGE_CODE = -32401;
+
+function isAuthError(error: unknown): boolean {
+  if (!error || !(error instanceof Error)) return false;
+  // SseError and StreamableHTTPClientTransport both surface HTTP 401 in code or message
+  const hasCode401 =
+    "code" in error && (error as { code: number }).code === 401;
+  const hasMsg401 =
+    error.message.includes("HTTP 401") ||
+    error.message.includes("(HTTP 401)") ||
+    error.message.toLowerCase().includes("unauthorized");
+  return hasCode401 || hasMsg401;
+}
+
 function onClientError(error: Error) {
   // Don't log "Not connected" errors as they're expected when connections close
   if (error?.message && error.message.includes("Not connected")) {
@@ -105,11 +122,23 @@ export default function mcpProxy({
 
       // Send error response back to client if it was a request (has id) and connection is still open
       if (isJSONRPCRequest(message) && !transportToClientClosed) {
+        // Use JSONRPC_AUTH_CHALLENGE_CODE for auth errors so the frontend can
+        // detect them and trigger the OAuth flow, rather than showing a generic error.
+        const errorCode = isAuthError(error)
+          ? JSONRPC_AUTH_CHALLENGE_CODE
+          : -32001;
+
+        if (errorCode === JSONRPC_AUTH_CHALLENGE_CODE) {
+          logger.info(
+            "Detected auth challenge from downstream MCP server, tagging response with code -32401",
+          );
+        }
+
         const errorResponse = {
           jsonrpc: "2.0" as const,
           id: message.id,
           error: {
-            code: -32001,
+            code: errorCode,
             message: error.message,
             data: error,
           },

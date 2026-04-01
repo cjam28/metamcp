@@ -1,4 +1,6 @@
 import {
+  DeleteOAuthSessionRequestSchema,
+  DeleteOAuthSessionResponseSchema,
   GetOAuthSessionRequestSchema,
   GetOAuthSessionResponseSchema,
   UpsertOAuthSessionRequestSchema,
@@ -19,6 +21,9 @@ export const createOAuthRouter = (
     upsert: (
       input: z.infer<typeof UpsertOAuthSessionRequestSchema>,
     ) => Promise<z.infer<typeof UpsertOAuthSessionResponseSchema>>;
+    delete: (
+      input: z.infer<typeof DeleteOAuthSessionRequestSchema>,
+    ) => Promise<z.infer<typeof DeleteOAuthSessionResponseSchema>>;
   },
 ) => {
   return router({
@@ -36,6 +41,14 @@ export const createOAuthRouter = (
       .output(UpsertOAuthSessionResponseSchema)
       .mutation(async ({ input }) => {
         return await implementations.upsert(input);
+      }),
+
+    // Protected: Delete (clear) OAuth session to force re-authorization
+    delete: protectedProcedure
+      .input(DeleteOAuthSessionRequestSchema)
+      .output(DeleteOAuthSessionResponseSchema)
+      .mutation(async ({ input }) => {
+        return await implementations.delete(input);
       }),
   });
 };

@@ -192,6 +192,22 @@ const serverRouter = express.Router();
 // Apply better auth middleware to all MCP proxy routes
 serverRouter.use(betterAuthMcpMiddleware);
 
+// Detects whether an error from a downstream MCP server transport is a 401/auth challenge.
+// StreamableHTTPClientTransport surfaces these as SseError (code=401) or as plain Errors
+// whose message contains "HTTP 401" / "Unauthorized".
+const isDownstream401 = (error: unknown): boolean => {
+  if (!error) return false;
+  if (error instanceof SseError && error.code === 401) return true;
+  if (error instanceof Error) {
+    return (
+      error.message.includes("HTTP 401") ||
+      error.message.includes("(HTTP 401)") ||
+      error.message.toLowerCase().includes("unauthorized")
+    );
+  }
+  return false;
+};
+
 const webAppTransports: Map<string, Transport> = new Map<string, Transport>(); // Web app transports by web app sessionId
 const serverTransports: Map<string, Transport> = new Map<string, Transport>(); // Server Transports by web app sessionId
 
@@ -554,11 +570,11 @@ serverRouter.get("/stdio", async (req, res) => {
       serverTransport = await createTransport(req);
       logger.info("Created server transport");
     } catch (error) {
-      if (error instanceof SseError && error.code === 401) {
+      if (isDownstream401(error)) {
         logger.error(
           "Received 401 Unauthorized from MCP server. Authentication failure.",
         );
-        res.status(401).json(error);
+        res.status(401).json({ message: "Unauthorized", code: 401 });
         return;
       }
 
@@ -750,11 +766,11 @@ serverRouter.get("/sse", async (req, res) => {
     try {
       serverTransport = await createTransport(req);
     } catch (error) {
-      if (error instanceof SseError && error.code === 401) {
+      if (isDownstream401(error)) {
         logger.error(
           "Received 401 Unauthorized from MCP server. Authentication failure.",
         );
-        res.status(401).json(error);
+        res.status(401).json({ message: "Unauthorized", code: 401 });
         return;
       } else if (error instanceof SseError && error.code === 404) {
         logger.error(

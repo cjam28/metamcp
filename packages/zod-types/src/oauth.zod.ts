@@ -149,6 +149,23 @@ export const UpsertOAuthSessionResponseSchema = z.union([
   }),
 ]);
 
+// Delete OAuth Session Request
+export const DeleteOAuthSessionRequestSchema = z.object({
+  mcp_server_uuid: z.string().uuid(),
+});
+
+// Delete OAuth Session Response
+export const DeleteOAuthSessionResponseSchema = z.union([
+  z.object({
+    success: z.literal(true),
+    message: z.string(),
+  }),
+  z.object({
+    success: z.literal(false),
+    message: z.string(),
+  }),
+]);
+
 // Repository-specific schemas
 export const OAuthSessionCreateInputSchema = z.object({
   mcp_server_uuid: z.string(),

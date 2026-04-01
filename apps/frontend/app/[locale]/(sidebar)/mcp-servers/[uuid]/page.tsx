@@ -10,6 +10,7 @@ import {
   Edit,
   Eye,
   EyeOff,
+  KeyRound,
   Plug,
   SearchCode,
   Server,
@@ -105,6 +106,41 @@ export default function McpServerDetailPage({
     isLoading,
     refetch,
   } = trpc.frontend.mcpServers.get.useQuery({ uuid });
+
+  const isStreamableHttp =
+    server?.type === McpServerTypeEnum.Enum.STREAMABLE_HTTP;
+
+  // Query OAuth session for STREAMABLE_HTTP servers to show Authorize / Re-authorize button
+  const { data: oauthSessionResponse, refetch: refetchOAuthSession } =
+    trpc.frontend.oauth.get.useQuery(
+      { mcp_server_uuid: uuid },
+      { enabled: isStreamableHttp && Boolean(server) },
+    );
+  const hasOAuthTokens = Boolean(
+    oauthSessionResponse?.success && oauthSessionResponse.data?.tokens,
+  );
+
+  // Mutation to clear stored OAuth session before re-authorizing
+  const deleteOAuthSessionMutation = trpc.frontend.oauth.delete.useMutation({
+    onSuccess: async () => {
+      await refetchOAuthSession();
+      // After clearing tokens, start the OAuth flow so the user is redirected immediately
+      await connection.triggerAuth();
+    },
+    onError: (error) => {
+      toast.error("Failed to clear OAuth session", {
+        description: error.message,
+      });
+    },
+  });
+
+  const handleAuthorize = async () => {
+    await connection.triggerAuth();
+  };
+
+  const handleReauthorize = () => {
+    deleteOAuthSessionMutation.mutate({ mcp_server_uuid: uuid });
+  };
 
   // tRPC mutation for deleting server
   const deleteMutation = trpc.frontend.mcpServers.delete.useMutation({
@@ -356,6 +392,24 @@ export default function McpServerDetailPage({
             <Edit className="h-4 w-4 mr-2" />
             {t("mcp-servers:detail.editServer")}
           </Button>
+          {isStreamableHttp && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={
+                hasOAuthTokens ? handleReauthorize : handleAuthorize
+              }
+              disabled={deleteOAuthSessionMutation.isPending}
+              title={
+                hasOAuthTokens
+                  ? "Clear stored tokens and re-authorize with OAuth"
+                  : "Authorize this server via OAuth"
+              }
+            >
+              <KeyRound className="h-4 w-4 mr-2" />
+              {hasOAuthTokens ? "Re-authorize" : "Authorize"}
+            </Button>
+          )}
           <Button
             variant="destructive"
             size="sm"
