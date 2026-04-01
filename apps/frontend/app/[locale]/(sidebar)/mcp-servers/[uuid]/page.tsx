@@ -107,41 +107,6 @@ export default function McpServerDetailPage({
     refetch,
   } = trpc.frontend.mcpServers.get.useQuery({ uuid });
 
-  const isStreamableHttp =
-    server?.type === McpServerTypeEnum.Enum.STREAMABLE_HTTP;
-
-  // Query OAuth session for STREAMABLE_HTTP servers to show Authorize / Re-authorize button
-  const { data: oauthSessionResponse, refetch: refetchOAuthSession } =
-    trpc.frontend.oauth.get.useQuery(
-      { mcp_server_uuid: uuid },
-      { enabled: isStreamableHttp && Boolean(server) },
-    );
-  const hasOAuthTokens = Boolean(
-    oauthSessionResponse?.success && oauthSessionResponse.data?.tokens,
-  );
-
-  // Mutation to clear stored OAuth session before re-authorizing
-  const deleteOAuthSessionMutation = trpc.frontend.oauth.delete.useMutation({
-    onSuccess: async () => {
-      await refetchOAuthSession();
-      // After clearing tokens, start the OAuth flow so the user is redirected immediately
-      await connection.triggerAuth();
-    },
-    onError: (error) => {
-      toast.error("Failed to clear OAuth session", {
-        description: error.message,
-      });
-    },
-  });
-
-  const handleAuthorize = async () => {
-    await connection.triggerAuth();
-  };
-
-  const handleReauthorize = () => {
-    deleteOAuthSessionMutation.mutate({ mcp_server_uuid: uuid });
-  };
-
   // tRPC mutation for deleting server
   const deleteMutation = trpc.frontend.mcpServers.delete.useMutation({
     onSuccess: (result) => {
@@ -196,6 +161,41 @@ export default function McpServerDetailPage({
         server.error_status !== McpServerErrorStatusEnum.Enum.ERROR,
     ),
   });
+
+  const isStreamableHttp =
+    server?.type === McpServerTypeEnum.Enum.STREAMABLE_HTTP;
+
+  // Query OAuth session for STREAMABLE_HTTP servers to show Authorize / Re-authorize button
+  const { data: oauthSessionResponse, refetch: refetchOAuthSession } =
+    trpc.frontend.oauth.get.useQuery(
+      { mcp_server_uuid: uuid },
+      { enabled: isStreamableHttp && Boolean(server) },
+    );
+  const hasOAuthTokens = Boolean(
+    oauthSessionResponse?.success && oauthSessionResponse.data?.tokens,
+  );
+
+  // Mutation to clear stored OAuth session before re-authorizing
+  const deleteOAuthSessionMutation = trpc.frontend.oauth.delete.useMutation({
+    onSuccess: async () => {
+      await refetchOAuthSession();
+      // After clearing tokens, start the OAuth flow so the user is redirected immediately
+      await connection.triggerAuth();
+    },
+    onError: (error) => {
+      toast.error("Failed to clear OAuth session", {
+        description: error.message,
+      });
+    },
+  });
+
+  const handleAuthorize = async () => {
+    await connection.triggerAuth();
+  };
+
+  const handleReauthorize = () => {
+    deleteOAuthSessionMutation.mutate({ mcp_server_uuid: uuid });
+  };
 
   // Auto-connect when hook is enabled and not already connected
   useEffect(() => {
@@ -396,9 +396,7 @@ export default function McpServerDetailPage({
             <Button
               variant="outline"
               size="sm"
-              onClick={
-                hasOAuthTokens ? handleReauthorize : handleAuthorize
-              }
+              onClick={hasOAuthTokens ? handleReauthorize : handleAuthorize}
               disabled={deleteOAuthSessionMutation.isPending}
               title={
                 hasOAuthTokens
