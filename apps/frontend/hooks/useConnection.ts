@@ -33,7 +33,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { McpServerType, McpServerTypeEnum } from "@repo/zod-types";
 import { useMemoizedFn } from "ahooks";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -103,6 +103,11 @@ export function useConnection({
     { request: string; response?: string }[]
   >([]);
   const [completionsSupported, setCompletionsSupported] = useState(true);
+
+  // Tracks the sonner toast ID for the in-progress connection, so we can
+  // update it to success/error when the operation finishes rather than
+  // appending a second toast.
+  const connectionToastRef = useRef<string | number | null>(null);
 
   // Fetch timeout configurations from the database
   const { data: mcpTimeout } = trpc.frontend.config.getMcpTimeout.useQuery(
@@ -348,6 +353,12 @@ export function useConnection({
         }
       }
 
+      // Only start a fresh loading toast on the first attempt (not on OAuth
+      // retries, which navigate away immediately or succeed silently).
+      if (retryCount === 0) {
+        connectionToastRef.current = toast.loading("Connecting to server…");
+      }
+
       const client = new Client<Request, Notification, Result>(
         {
           name: "metamcp-proxy",
@@ -589,6 +600,10 @@ export function useConnection({
 
           // Check if it's a proxy auth error
           if (isProxyAuthError(error)) {
+            if (connectionToastRef.current !== null) {
+              toast.dismiss(connectionToastRef.current);
+              connectionToastRef.current = null;
+            }
             toast.error(
               "Please enter the session token from the proxy server console in the Configuration settings.",
             );
@@ -601,8 +616,12 @@ export function useConnection({
             return connect(undefined, retryCount + 1);
           }
           if (is401Error(error)) {
-            // Don't set error state if we're about to redirect for auth
-
+            // OAuth redirect initiated — dismiss the connecting toast and let
+            // triggerAuth's own toast take over.
+            if (connectionToastRef.current !== null) {
+              toast.dismiss(connectionToastRef.current);
+              connectionToastRef.current = null;
+            }
             return;
           }
           throw error;
@@ -626,9 +645,23 @@ export function useConnection({
 
         setMcpClient(client);
         setConnectionStatus("connected");
+
+        if (connectionToastRef.current !== null) {
+          toast.success("Connected", {
+            id: connectionToastRef.current,
+            duration: 2000,
+            description: undefined,
+          });
+          connectionToastRef.current = null;
+        }
       } catch (e) {
         console.error(e);
         setConnectionStatus("error");
+
+        if (connectionToastRef.current !== null) {
+          toast.dismiss(connectionToastRef.current);
+          connectionToastRef.current = null;
+        }
       }
     },
   );
@@ -707,6 +740,13 @@ export function useConnection({
 
     const redirectUri = getAppUrl() + "/fe-oauth/callback";
 
+    // Show a persistent loading toast so the user knows something is happening
+    // while the backend performs OAuth discovery + client registration (can take
+    // 1–3 s on the first call).
+    const authToastId = toast.loading("Contacting OAuth server…", {
+      description: "Performing discovery and client registration",
+    });
+
     try {
       const result = await vanillaTrpcClient.frontend.oauth.initiateFlow.mutate(
         {
@@ -719,17 +759,26 @@ export function useConnection({
       if (result.success) {
         sessionStorage.setItem(SESSION_KEYS.SERVER_URL, url || "");
         sessionStorage.setItem(SESSION_KEYS.MCP_SERVER_UUID, mcpServerUuid);
+        // Update the toast before navigating — it will be visible for a moment
+        toast.loading("Redirecting to authorization page…", {
+          id: authToastId,
+          description: undefined,
+        });
         window.location.href = result.authorization_url;
         return false; // page will navigate away before this resolves
       } else {
         toast.error("OAuth authorization failed", {
+          id: authToastId,
           description: result.message,
         });
         return false;
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      toast.error("Failed to start OAuth flow", { description: msg });
+      toast.error("Failed to start OAuth flow", {
+        id: authToastId,
+        description: msg,
+      });
       return false;
     }
   });
