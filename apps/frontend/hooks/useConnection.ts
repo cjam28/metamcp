@@ -353,9 +353,12 @@ export function useConnection({
         }
       }
 
-      // Only start a fresh loading toast on the first attempt (not on OAuth
-      // retries, which navigate away immediately or succeed silently).
+      // Mark connecting immediately so consumers (e.g. server detail auto-connect
+      // effect) do not call connect() again while this async work is in flight.
+      // Previously status stayed "disconnected" until success, causing duplicate
+      // connections and stacked "Connecting…" toasts.
       if (retryCount === 0) {
+        setConnectionStatus("connecting");
         connectionToastRef.current = toast.loading("Connecting to server…");
       }
 
@@ -377,6 +380,10 @@ export function useConnection({
       try {
         await checkProxyHealth();
       } catch {
+        if (connectionToastRef.current !== null) {
+          toast.dismiss(connectionToastRef.current);
+          connectionToastRef.current = null;
+        }
         setConnectionStatus("error-connecting-to-proxy");
         return;
       }
@@ -617,7 +624,9 @@ export function useConnection({
           }
           if (is401Error(error)) {
             // OAuth redirect initiated — dismiss the connecting toast and let
-            // triggerAuth's own toast take over.
+            // triggerAuth's own toast take over. Keep status as "connecting"
+            // until navigation (avoid auto-connect effect firing a second
+            // connect() before window.location.assign completes).
             if (connectionToastRef.current !== null) {
               toast.dismiss(connectionToastRef.current);
               connectionToastRef.current = null;
@@ -771,6 +780,7 @@ export function useConnection({
           id: authToastId,
           description: result.message,
         });
+        setConnectionStatus("disconnected");
         return false;
       }
     } catch (error) {
@@ -779,6 +789,7 @@ export function useConnection({
         id: authToastId,
         description: msg,
       });
+      setConnectionStatus("disconnected");
       return false;
     }
   });

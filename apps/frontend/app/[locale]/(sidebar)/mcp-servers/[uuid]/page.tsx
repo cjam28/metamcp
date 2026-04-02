@@ -162,6 +162,8 @@ export default function McpServerDetailPage({
     ),
   });
 
+  const { connect, connectionStatus, triggerAuth } = connection;
+
   const isStreamableHttp =
     server?.type === McpServerTypeEnum.Enum.STREAMABLE_HTTP;
 
@@ -180,7 +182,7 @@ export default function McpServerDetailPage({
     onSuccess: async () => {
       await refetchOAuthSession();
       // After clearing tokens, start the OAuth flow so the user is redirected immediately
-      await connection.triggerAuth();
+      await triggerAuth();
     },
     onError: (error) => {
       toast.error("Failed to clear OAuth session", {
@@ -190,25 +192,33 @@ export default function McpServerDetailPage({
   });
 
   const handleAuthorize = async () => {
-    await connection.triggerAuth();
+    await triggerAuth();
   };
 
   const handleReauthorize = () => {
     deleteOAuthSessionMutation.mutate({ mcp_server_uuid: uuid });
   };
 
-  // Auto-connect when hook is enabled and not already connected
+  // Auto-connect when the hook is enabled and idle. Do not depend on the whole
+  // `connection` object — useConnection returns a new object reference every
+  // render, which re-fired this effect and called connect() multiple times.
   useEffect(() => {
     if (
-      connection &&
-      server &&
-      !isLoading &&
-      server.error_status !== McpServerErrorStatusEnum.Enum.ERROR &&
-      connection.connectionStatus === "disconnected"
+      !server ||
+      isLoading ||
+      server.error_status === McpServerErrorStatusEnum.Enum.ERROR ||
+      connectionStatus !== "disconnected"
     ) {
-      connection.connect();
+      return;
     }
-  }, [server, connection, isLoading]);
+    void connect();
+  }, [
+    connect,
+    connectionStatus,
+    isLoading,
+    server?.uuid,
+    server?.error_status,
+  ]);
 
   // Handle delete server
   const handleDeleteServer = async () => {
