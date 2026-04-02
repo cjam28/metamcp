@@ -37,7 +37,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <ThemeProvider>
           <TRPCProvider>
             {children}
-            <Toaster richColors position="top-right" closeButton />
+            <Toaster richColors position="bottom-right" closeButton />
           </TRPCProvider>
         </ThemeProvider>
       </body>
