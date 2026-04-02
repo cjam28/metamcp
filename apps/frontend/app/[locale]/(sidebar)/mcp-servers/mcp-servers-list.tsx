@@ -11,6 +11,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  RowSelectionState,
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
@@ -34,6 +35,7 @@ import { EditMcpServer } from "@/components/edit-mcp-server";
 import { McpServersListSkeleton } from "@/components/skeletons/mcp-servers-list-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -58,7 +60,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useTranslations } from "@/hooks/useTranslations";
-import { trpc } from "@/lib/trpc";
+import { trpc, vanillaTrpcClient } from "@/lib/trpc";
 
 interface McpServersListProps {
   onRefresh?: () => void;
@@ -79,6 +81,9 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [serverToEdit, setServerToEdit] = useState<McpServer | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Get tRPC utils for cache invalidation
   const utils = trpc.useUtils();
@@ -139,8 +144,82 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
     setServerToEdit(null);
   };
 
+  // Handle bulk delete — deletes selected servers sequentially and reports
+  // live progress via a persistent toast so the UI never appears frozen.
+  const handleBulkDelete = async () => {
+    const selectedRows = table.getSelectedRowModel().rows;
+    const total = selectedRows.length;
+    if (total === 0) return;
+
+    setBulkDeleteDialogOpen(false);
+    setIsBulkDeleting(true);
+
+    const toastId = toast.loading(`Deleting 0 of ${total} server${total !== 1 ? "s" : ""}…`);
+
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const row of selectedRows) {
+      try {
+        await vanillaTrpcClient.frontend.mcpServers.delete.mutate({
+          uuid: row.original.uuid,
+        });
+        succeeded++;
+      } catch {
+        failed++;
+      }
+      const done = succeeded + failed;
+      toast.loading(
+        `Deleting ${done} of ${total} server${total !== 1 ? "s" : ""}…`,
+        { id: toastId },
+      );
+    }
+
+    await utils.frontend.mcpServers.list.invalidate();
+    setRowSelection({});
+    setIsBulkDeleting(false);
+
+    if (failed === 0) {
+      toast.success(
+        `Deleted ${succeeded} server${succeeded !== 1 ? "s" : ""}`,
+        { id: toastId },
+      );
+    } else {
+      toast.warning(
+        `Deleted ${succeeded} of ${total}; ${failed} failed`,
+        { id: toastId },
+      );
+    }
+  };
+
   // Define columns for the data table
   const columns: ColumnDef<McpServer>[] = [
+    {
+      id: "select",
+      size: 40,
+      header: ({ table: t }) => (
+        <Checkbox
+          checked={
+            t.getIsAllPageRowsSelected() ||
+            (t.getIsSomePageRowsSelected() ? "indeterminate" : false)
+          }
+          onCheckedChange={(value) => t.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className="translate-y-[2px]"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className="translate-y-[2px]"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+      enableSorting: false,
+      enableGlobalFilter: false,
+    },
     {
       accessorKey: "name",
       size: 200,
@@ -432,6 +511,8 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
     columns,
     onSortingChange: setSorting,
     onGlobalFilterChange: (value) => setGlobalFilter(value || ""),
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection: true,
     globalFilterFn: "includesString",
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -440,6 +521,7 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
     state: {
       sorting,
       globalFilter,
+      rowSelection,
     },
   });
 
@@ -501,6 +583,36 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
         onSuccess={handleEditSuccess}
       />
 
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Delete {Object.keys(rowSelection).length} server
+              {Object.keys(rowSelection).length !== 1 ? "s" : ""}?
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently delete all {Object.keys(rowSelection).length}{" "}
+              selected server
+              {Object.keys(rowSelection).length !== 1 ? "s" : ""}. This action
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkDeleteDialogOpen(false)}
+            >
+              {t("common:cancel")}
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete}>
+              Delete {Object.keys(rowSelection).length} server
+              {Object.keys(rowSelection).length !== 1 ? "s" : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
@@ -541,7 +653,7 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
       </Dialog>
 
       <div className="space-y-4">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-between gap-2">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -551,6 +663,34 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
               className="pl-8"
             />
           </div>
+
+          {/* Bulk action bar — appears when one or more rows are selected */}
+          {Object.keys(rowSelection).length > 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5">
+              <span className="text-sm text-muted-foreground">
+                {Object.keys(rowSelection).length} selected
+              </span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setBulkDeleteDialogOpen(true)}
+                disabled={isBulkDeleting}
+                className="h-7 text-xs"
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Delete selected
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRowSelection({})}
+                disabled={isBulkDeleting}
+                className="h-7 text-xs text-muted-foreground"
+              >
+                Clear
+              </Button>
+            </div>
+          )}
         </div>
         <div className="rounded-md border">
           <Table>
