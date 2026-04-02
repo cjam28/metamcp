@@ -1,4 +1,3 @@
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   SSEClientTransport,
@@ -47,7 +46,7 @@ import {
   StdErrNotificationSchema,
 } from "../lib/notificationTypes";
 import { createAuthProvider } from "../lib/oauth-provider";
-import { trpc } from "../lib/trpc";
+import { trpc, vanillaTrpcClient } from "../lib/trpc";
 
 interface UseConnectionOptions {
   mcpServerUuid: string;
@@ -320,13 +319,10 @@ export function useConnection({
 
   const handleAuthError = useMemoizedFn(async (error: unknown) => {
     if (is401Error(error)) {
-      sessionStorage.setItem(SESSION_KEYS.SERVER_URL, url || "");
-      sessionStorage.setItem(SESSION_KEYS.MCP_SERVER_UUID, mcpServerUuid);
-
-      const result = await auth(authProvider, {
-        serverUrl: url || "",
-      });
-      return result === "AUTHORIZED";
+      // Delegate to triggerAuth which proxies all OAuth requests through the
+      // MetaMCP backend, avoiding browser-side CORS issues with external OAuth
+      // servers (e.g. Gusto, Zoho).
+      return triggerAuth();
     }
     return false;
   });
@@ -703,14 +699,39 @@ export function useConnection({
     };
   }, [connectionStatus, disconnect]);
 
-  // Expose a way for UI to proactively start the OAuth flow (e.g. "Authorize" button)
-  // without needing to trigger a failed request first.
+  // Expose a way for UI to proactively start the OAuth flow (e.g. "Authorize" button).
+  // All discovery, dynamic client registration, and token exchange run server-side
+  // via tRPC mutations to avoid CORS errors from browser → external OAuth endpoints.
   const triggerAuth = useMemoizedFn(async (): Promise<boolean> => {
     if (typeof window === "undefined") return false;
-    sessionStorage.setItem(SESSION_KEYS.SERVER_URL, url || "");
-    sessionStorage.setItem(SESSION_KEYS.MCP_SERVER_UUID, mcpServerUuid);
-    const result = await auth(authProvider, { serverUrl: url || "" });
-    return result === "AUTHORIZED";
+
+    const redirectUri = getAppUrl() + "/fe-oauth/callback";
+
+    try {
+      const result = await vanillaTrpcClient.frontend.oauth.initiateFlow.mutate(
+        {
+          mcp_server_uuid: mcpServerUuid,
+          mcp_server_url: url || "",
+          redirect_uri: redirectUri,
+        },
+      );
+
+      if (result.success) {
+        sessionStorage.setItem(SESSION_KEYS.SERVER_URL, url || "");
+        sessionStorage.setItem(SESSION_KEYS.MCP_SERVER_UUID, mcpServerUuid);
+        window.location.href = result.authorization_url;
+        return false; // page will navigate away before this resolves
+      } else {
+        toast.error("OAuth authorization failed", {
+          description: result.message,
+        });
+        return false;
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error("Failed to start OAuth flow", { description: msg });
+      return false;
+    }
   });
 
   return {

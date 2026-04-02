@@ -202,6 +202,41 @@ export const DatabaseOAuthSessionSchema = z.object({
 
 export type DatabaseOAuthSession = z.infer<typeof DatabaseOAuthSessionSchema>;
 
+// Initiate server-side OAuth flow (discovery + registration run on the backend, no CORS)
+export const InitiateOAuthFlowRequestSchema = z.object({
+  mcp_server_uuid: z.string().uuid(),
+  mcp_server_url: z.string().url(),
+  redirect_uri: z.string().url(),
+});
+
+export const InitiateOAuthFlowResponseSchema = z.union([
+  z.object({
+    success: z.literal(true),
+    authorization_url: z.string().url(),
+  }),
+  z.object({
+    success: z.literal(false),
+    message: z.string(),
+  }),
+]);
+
+// Complete server-side OAuth flow (token exchange runs on the backend, no CORS)
+export const CompleteOAuthFlowRequestSchema = z.object({
+  mcp_server_uuid: z.string().uuid(),
+  code: z.string(),
+});
+
+export const CompleteOAuthFlowResponseSchema = z.union([
+  z.object({
+    success: z.literal(true),
+    message: z.string(),
+  }),
+  z.object({
+    success: z.literal(false),
+    message: z.string(),
+  }),
+]);
+
 // Export OAuth types
 export type OAuthClient = z.infer<typeof OAuthClientSchema>;
 export type OAuthClientCreateInput = z.infer<

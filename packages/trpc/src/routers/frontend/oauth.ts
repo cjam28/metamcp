@@ -1,8 +1,12 @@
 import {
+  CompleteOAuthFlowRequestSchema,
+  CompleteOAuthFlowResponseSchema,
   DeleteOAuthSessionRequestSchema,
   DeleteOAuthSessionResponseSchema,
   GetOAuthSessionRequestSchema,
   GetOAuthSessionResponseSchema,
+  InitiateOAuthFlowRequestSchema,
+  InitiateOAuthFlowResponseSchema,
   UpsertOAuthSessionRequestSchema,
   UpsertOAuthSessionResponseSchema,
 } from "@repo/zod-types";
@@ -24,6 +28,12 @@ export const createOAuthRouter = (
     delete: (
       input: z.infer<typeof DeleteOAuthSessionRequestSchema>,
     ) => Promise<z.infer<typeof DeleteOAuthSessionResponseSchema>>;
+    initiateFlow: (
+      input: z.infer<typeof InitiateOAuthFlowRequestSchema>,
+    ) => Promise<z.infer<typeof InitiateOAuthFlowResponseSchema>>;
+    completeFlow: (
+      input: z.infer<typeof CompleteOAuthFlowRequestSchema>,
+    ) => Promise<z.infer<typeof CompleteOAuthFlowResponseSchema>>;
   },
 ) => {
   return router({
@@ -49,6 +59,22 @@ export const createOAuthRouter = (
       .output(DeleteOAuthSessionResponseSchema)
       .mutation(async ({ input }) => {
         return await implementations.delete(input);
+      }),
+
+    // Protected: Initiate server-side OAuth flow (discovery + DCR + PKCE, no browser CORS)
+    initiateFlow: protectedProcedure
+      .input(InitiateOAuthFlowRequestSchema)
+      .output(InitiateOAuthFlowResponseSchema)
+      .mutation(async ({ input }) => {
+        return await implementations.initiateFlow(input);
+      }),
+
+    // Protected: Complete server-side OAuth flow (token exchange, no browser CORS)
+    completeFlow: protectedProcedure
+      .input(CompleteOAuthFlowRequestSchema)
+      .output(CompleteOAuthFlowResponseSchema)
+      .mutation(async ({ input }) => {
+        return await implementations.completeFlow(input);
       }),
   });
 };
