@@ -205,7 +205,6 @@ export type DatabaseOAuthSession = z.infer<typeof DatabaseOAuthSessionSchema>;
 // Initiate server-side OAuth flow (discovery + registration run on the backend, no CORS)
 export const InitiateOAuthFlowRequestSchema = z.object({
   mcp_server_uuid: z.string().uuid(),
-  mcp_server_url: z.string().url(),
   redirect_uri: z.string().url(),
 });
 
@@ -224,6 +223,7 @@ export const InitiateOAuthFlowResponseSchema = z.union([
 export const CompleteOAuthFlowRequestSchema = z.object({
   mcp_server_uuid: z.string().uuid(),
   code: z.string(),
+  state: z.string(),
 });
 
 export const CompleteOAuthFlowResponseSchema = z.union([

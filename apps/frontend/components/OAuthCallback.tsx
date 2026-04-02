@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle, Circle, Loader2, XCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { SESSION_KEYS } from "../lib/constants";
 import { vanillaTrpcClient } from "../lib/trpc";
@@ -27,7 +27,8 @@ const StepIcon = ({ status }: { status: StepStatus }) => {
 };
 
 const OAuthCallback = () => {
-  const hasProcessedRef = useRef(false);
+  // Intentionally no useRef — useRef(false) resets on remount in React 18 Strict Mode,
+  // allowing duplicate completeFlow calls. A sessionStorage flag survives remounts.
   const [steps, setSteps] = useState<OAuthStep[]>([
     { label: "Authorization received", status: "done" },
     { label: "Exchanging tokens with server", status: "active" },
@@ -45,18 +46,22 @@ const OAuthCallback = () => {
 
   useEffect(() => {
     const handleCallback = async () => {
-      if (hasProcessedRef.current) {
+      // Strict Mode guard: if another effect invocation already claimed this callback,
+      // bail out immediately to prevent duplicate token exchanges.
+      if (sessionStorage.getItem(SESSION_KEYS.OAUTH_CALLBACK_PROCESSING)) {
         return;
       }
-      hasProcessedRef.current = true;
+      sessionStorage.setItem(SESSION_KEYS.OAUTH_CALLBACK_PROCESSING, "1");
 
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
+      const state = params.get("state");
       const mcpServerUuid = sessionStorage.getItem(SESSION_KEYS.MCP_SERVER_UUID);
 
-      if (!code || !mcpServerUuid) {
+      if (!code || !state || !mcpServerUuid) {
         console.error("Missing required OAuth callback parameters");
         updateStep(1, { status: "error", detail: "Missing callback parameters" });
+        sessionStorage.removeItem(SESSION_KEYS.OAUTH_CALLBACK_PROCESSING);
         setTimeout(() => {
           window.location.href = "/mcp-servers";
         }, 2000);
@@ -65,16 +70,20 @@ const OAuthCallback = () => {
 
       try {
         // Token exchange runs server-side via tRPC — no browser CORS issues.
+        // The `state` param is forwarded so the backend can verify it against the stored
+        // value, preventing CSRF attacks.
         const result = await vanillaTrpcClient.frontend.oauth.completeFlow.mutate(
           {
             mcp_server_uuid: mcpServerUuid,
             code,
+            state,
           },
         );
 
         // Clean up session storage regardless of outcome
         sessionStorage.removeItem(SESSION_KEYS.SERVER_URL);
         sessionStorage.removeItem(SESSION_KEYS.MCP_SERVER_UUID);
+        sessionStorage.removeItem(SESSION_KEYS.OAUTH_CALLBACK_PROCESSING);
 
         if (result.success) {
           updateStep(1, { status: "done" });
@@ -96,6 +105,7 @@ const OAuthCallback = () => {
         updateStep(1, { status: "error", detail: msg });
         sessionStorage.removeItem(SESSION_KEYS.SERVER_URL);
         sessionStorage.removeItem(SESSION_KEYS.MCP_SERVER_UUID);
+        sessionStorage.removeItem(SESSION_KEYS.OAUTH_CALLBACK_PROCESSING);
         setTimeout(() => {
           window.location.href = "/mcp-servers";
         }, 3000);

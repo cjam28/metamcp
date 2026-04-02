@@ -21,18 +21,23 @@ export const createOAuthRouter = (
   implementations: {
     get: (
       input: z.infer<typeof GetOAuthSessionRequestSchema>,
+      userId: string,
     ) => Promise<z.infer<typeof GetOAuthSessionResponseSchema>>;
     upsert: (
       input: z.infer<typeof UpsertOAuthSessionRequestSchema>,
+      userId: string,
     ) => Promise<z.infer<typeof UpsertOAuthSessionResponseSchema>>;
     delete: (
       input: z.infer<typeof DeleteOAuthSessionRequestSchema>,
+      userId: string,
     ) => Promise<z.infer<typeof DeleteOAuthSessionResponseSchema>>;
     initiateFlow: (
       input: z.infer<typeof InitiateOAuthFlowRequestSchema>,
+      userId: string,
     ) => Promise<z.infer<typeof InitiateOAuthFlowResponseSchema>>;
     completeFlow: (
       input: z.infer<typeof CompleteOAuthFlowRequestSchema>,
+      userId: string,
     ) => Promise<z.infer<typeof CompleteOAuthFlowResponseSchema>>;
   },
 ) => {
@@ -41,40 +46,40 @@ export const createOAuthRouter = (
     get: protectedProcedure
       .input(GetOAuthSessionRequestSchema)
       .output(GetOAuthSessionResponseSchema)
-      .query(async ({ input }) => {
-        return await implementations.get(input);
+      .query(async ({ input, ctx }) => {
+        return await implementations.get(input, ctx.user.id);
       }),
 
     // Protected: Upsert OAuth session
     upsert: protectedProcedure
       .input(UpsertOAuthSessionRequestSchema)
       .output(UpsertOAuthSessionResponseSchema)
-      .mutation(async ({ input }) => {
-        return await implementations.upsert(input);
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.upsert(input, ctx.user.id);
       }),
 
     // Protected: Delete (clear) OAuth session to force re-authorization
     delete: protectedProcedure
       .input(DeleteOAuthSessionRequestSchema)
       .output(DeleteOAuthSessionResponseSchema)
-      .mutation(async ({ input }) => {
-        return await implementations.delete(input);
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.delete(input, ctx.user.id);
       }),
 
     // Protected: Initiate server-side OAuth flow (discovery + DCR + PKCE, no browser CORS)
     initiateFlow: protectedProcedure
       .input(InitiateOAuthFlowRequestSchema)
       .output(InitiateOAuthFlowResponseSchema)
-      .mutation(async ({ input }) => {
-        return await implementations.initiateFlow(input);
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.initiateFlow(input, ctx.user.id);
       }),
 
     // Protected: Complete server-side OAuth flow (token exchange, no browser CORS)
     completeFlow: protectedProcedure
       .input(CompleteOAuthFlowRequestSchema)
       .output(CompleteOAuthFlowResponseSchema)
-      .mutation(async ({ input }) => {
-        return await implementations.completeFlow(input);
+      .mutation(async ({ input, ctx }) => {
+        return await implementations.completeFlow(input, ctx.user.id);
       }),
   });
 };

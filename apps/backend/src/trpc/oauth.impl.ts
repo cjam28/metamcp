@@ -15,14 +15,37 @@ import { z } from "zod";
 
 import logger from "@/utils/logger";
 
-import { oauthSessionsRepository } from "../db/repositories";
+import {
+  mcpServersRepository,
+  oauthSessionsRepository,
+} from "../db/repositories";
 import { OAuthSessionsSerializer } from "../db/serializers";
+
+/**
+ * Asserts that the authenticated user owns (or has access to) the given MCP server.
+ * Throws an Error if not found or if the server belongs to a different user.
+ */
+async function assertServerOwnership(
+  mcp_server_uuid: string,
+  userId: string,
+): Promise<void> {
+  const server = await mcpServersRepository.findByUuid(mcp_server_uuid);
+  if (!server) {
+    throw new Error("MCP server not found");
+  }
+  // null user_id means the server is shared/public within the instance
+  if (server.user_id !== null && server.user_id !== userId) {
+    throw new Error("Access denied");
+  }
+}
 
 export const oauthImplementations = {
   delete: async (
     input: z.infer<typeof DeleteOAuthSessionRequestSchema>,
+    userId: string,
   ): Promise<z.infer<typeof DeleteOAuthSessionResponseSchema>> => {
     try {
+      await assertServerOwnership(input.mcp_server_uuid, userId);
       await oauthSessionsRepository.deleteByMcpServerUuid(
         input.mcp_server_uuid,
       );
@@ -34,15 +57,18 @@ export const oauthImplementations = {
       logger.error("Error deleting OAuth session:", error);
       return {
         success: false as const,
-        message: "Failed to delete OAuth session",
+        message:
+          error instanceof Error ? error.message : "Failed to delete OAuth session",
       };
     }
   },
 
   get: async (
     input: z.infer<typeof GetOAuthSessionRequestSchema>,
+    userId: string,
   ): Promise<z.infer<typeof GetOAuthSessionResponseSchema>> => {
     try {
+      await assertServerOwnership(input.mcp_server_uuid, userId);
       const session = await oauthSessionsRepository.findByMcpServerUuid(
         input.mcp_server_uuid,
       );
@@ -63,15 +89,18 @@ export const oauthImplementations = {
       logger.error("Error fetching OAuth session:", error);
       return {
         success: false as const,
-        message: "Failed to fetch OAuth session",
+        message:
+          error instanceof Error ? error.message : "Failed to fetch OAuth session",
       };
     }
   },
 
   upsert: async (
     input: z.infer<typeof UpsertOAuthSessionRequestSchema>,
+    userId: string,
   ): Promise<z.infer<typeof UpsertOAuthSessionResponseSchema>> => {
     try {
+      await assertServerOwnership(input.mcp_server_uuid, userId);
       const session = await oauthSessionsRepository.upsert({
         mcp_server_uuid: input.mcp_server_uuid,
         ...(input.client_information && {
@@ -107,15 +136,32 @@ export const oauthImplementations = {
    * entirely in Node.js so the browser never touches the remote OAuth server directly
    * (which would be blocked by CORS).
    *
-   * Stores { codeVerifier, tokenEndpoint, redirectUri, clientId } as JSON in the
-   * `code_verifier` DB column for retrieval during completeFlow.
+   * Stores { codeVerifier, state, tokenEndpoint, redirectUri, clientId } as JSON in
+   * the `code_verifier` DB column for retrieval during completeFlow.
    */
   initiateFlow: async (
     input: z.infer<typeof InitiateOAuthFlowRequestSchema>,
+    userId: string,
   ): Promise<z.infer<typeof InitiateOAuthFlowResponseSchema>> => {
-    const { mcp_server_uuid, mcp_server_url, redirect_uri } = input;
+    const { mcp_server_uuid, redirect_uri } = input;
 
     try {
+      // Verify user owns this server and retrieve the stored URL from DB (SSRF/IDOR fix)
+      const server = await mcpServersRepository.findByUuid(mcp_server_uuid);
+      if (!server) {
+        return { success: false as const, message: "MCP server not found" };
+      }
+      if (server.user_id !== null && server.user_id !== userId) {
+        return { success: false as const, message: "Access denied" };
+      }
+      const mcp_server_url = server.url;
+      if (!mcp_server_url) {
+        return {
+          success: false as const,
+          message: "MCP server has no URL configured",
+        };
+      }
+
       // --- Step 1: discover the OAuth authorization server ---
       const baseUrl = new URL(mcp_server_url);
       const serverBaseUrl = `${baseUrl.protocol}//${baseUrl.host}`;
@@ -259,11 +305,13 @@ export const oauthImplementations = {
 
       const state = crypto.randomBytes(16).toString("hex");
 
-      // Store everything needed for completeFlow as JSON in the code_verifier column
+      // Store everything needed for completeFlow as JSON in the code_verifier column,
+      // including `state` so completeFlow can verify the callback is authentic (CSRF fix).
       await oauthSessionsRepository.upsert({
         mcp_server_uuid,
         code_verifier: JSON.stringify({
           codeVerifier,
+          state,
           tokenEndpoint,
           redirectUri: redirect_uri,
           clientId,
@@ -300,10 +348,13 @@ export const oauthImplementations = {
    */
   completeFlow: async (
     input: z.infer<typeof CompleteOAuthFlowRequestSchema>,
+    userId: string,
   ): Promise<z.infer<typeof CompleteOAuthFlowResponseSchema>> => {
-    const { mcp_server_uuid, code } = input;
+    const { mcp_server_uuid, code, state: receivedState } = input;
 
     try {
+      await assertServerOwnership(mcp_server_uuid, userId);
+
       const session =
         await oauthSessionsRepository.findByMcpServerUuid(mcp_server_uuid);
 
@@ -316,6 +367,7 @@ export const oauthImplementations = {
 
       let parsed: {
         codeVerifier: string;
+        state: string;
         tokenEndpoint: string;
         redirectUri: string;
         clientId: string;
@@ -331,7 +383,16 @@ export const oauthImplementations = {
         };
       }
 
-      const { codeVerifier, tokenEndpoint, redirectUri, clientId, clientSecret } = parsed;
+      const { codeVerifier, state: storedState, tokenEndpoint, redirectUri, clientId, clientSecret } = parsed;
+
+      // Verify OAuth state to prevent CSRF attacks
+      if (!storedState || storedState !== receivedState) {
+        logger.warn(`OAuth state mismatch for ${mcp_server_uuid}: expected ${storedState}, got ${receivedState}`);
+        return {
+          success: false as const,
+          message: "OAuth state mismatch — possible CSRF attack. Please re-authorize.",
+        };
+      }
 
       // --- Exchange auth code for tokens ---
       const body = new URLSearchParams({
@@ -367,13 +428,17 @@ export const oauthImplementations = {
         scope?: string;
       };
 
-      // Persist tokens and clear the one-time code_verifier JSON
+      // Persist tokens and clear the one-time code_verifier JSON.
+      // Use !== undefined checks (not truthiness) so that expires_in: 0 is preserved.
       await oauthSessionsRepository.upsert({
         mcp_server_uuid,
         tokens: {
           access_token: tokenData.access_token,
           token_type: tokenData.token_type ?? "Bearer",
-          ...(tokenData.expires_in && { expires_in: tokenData.expires_in }),
+          ...(tokenData.expires_in !== undefined &&
+            tokenData.expires_in !== null && {
+              expires_in: tokenData.expires_in,
+            }),
           ...(tokenData.refresh_token && {
             refresh_token: tokenData.refresh_token,
           }),

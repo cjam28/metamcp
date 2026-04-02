@@ -1035,59 +1035,61 @@ export async function initializeEnvironmentConfiguration(): Promise<void> {
     "🔓 Temporarily enabling registration for bootstrap...",
   );
 
-  // Bootstrap all users
-  let userMap: Map<string, string>;
+  // Wrap all bootstrap work in try/finally so registration controls are always
+  // restored to the configured steady-state even if the process crashes mid-boot.
+  let userMap: Map<string, string> = new Map();
+  let namespaceMap: Map<string, string> = new Map();
   try {
-    userMap = await bootstrapUsers(config);
-  } catch (err) {
-    console.warn("⚠️ Users bootstrap failed:", err);
-    userMap = new Map();
-  }
-
-  // Delete other users after bootstrapping configured users
-  try {
-    const bootstrappedEmails = Array.from(userMap.keys());
-    await maybeDeleteOtherUsers(config, bootstrappedEmails);
-  } catch (err) {
-    console.warn("⚠️ User cleanup step failed:", err);
-  }
-
-  // Bootstrap API keys
-  try {
-    await bootstrapApiKeys(config, userMap);
-  } catch (err) {
-    console.warn("⚠️ API keys bootstrap failed:", err);
-  }
-
-  // Bootstrap namespaces and collect UUID mappings
-  let namespaceMap: Map<string, string>;
-  try {
-    namespaceMap = await bootstrapNamespaces(config, userMap);
-  } catch (err) {
-    console.warn("⚠️ Namespaces bootstrap failed:", err);
-    namespaceMap = new Map();
-  }
-
-  // Bootstrap endpoints
-  try {
-    await bootstrapEndpoints(config, namespaceMap, userMap);
-  } catch (err) {
-    console.warn("⚠️ Endpoints bootstrap failed:", err);
-  }
-
-  // Mark one-time bootstrap complete
-  if (config.bootstrapOnlyOnFirstRun) {
-    if (userMap.size > 0 || namespaceMap.size > 0) {
-      await markBootstrapComplete();
+    // Bootstrap all users
+    try {
+      userMap = await bootstrapUsers(config);
+    } catch (err) {
+      console.warn("⚠️ Users bootstrap failed:", err);
     }
-  }
 
-  // Apply registration controls after bootstrapping so initial user creation
-  // is not blocked when signup is disabled for steady-state operation.
-  await applyRegistrationControls(
-    config.disableUiRegistration,
-    config.disableSsoRegistration,
-  );
+    // Delete other users after bootstrapping configured users
+    try {
+      const bootstrappedEmails = Array.from(userMap.keys());
+      await maybeDeleteOtherUsers(config, bootstrappedEmails);
+    } catch (err) {
+      console.warn("⚠️ User cleanup step failed:", err);
+    }
+
+    // Bootstrap API keys
+    try {
+      await bootstrapApiKeys(config, userMap);
+    } catch (err) {
+      console.warn("⚠️ API keys bootstrap failed:", err);
+    }
+
+    // Bootstrap namespaces and collect UUID mappings
+    try {
+      namespaceMap = await bootstrapNamespaces(config, userMap);
+    } catch (err) {
+      console.warn("⚠️ Namespaces bootstrap failed:", err);
+    }
+
+    // Bootstrap endpoints
+    try {
+      await bootstrapEndpoints(config, namespaceMap, userMap);
+    } catch (err) {
+      console.warn("⚠️ Endpoints bootstrap failed:", err);
+    }
+
+    // Mark one-time bootstrap complete
+    if (config.bootstrapOnlyOnFirstRun) {
+      if (userMap.size > 0 || namespaceMap.size > 0) {
+        await markBootstrapComplete();
+      }
+    }
+  } finally {
+    // Always restore the configured registration controls, even on unexpected errors,
+    // to ensure signup is not left permanently open after a partial bootstrap.
+    await applyRegistrationControls(
+      config.disableUiRegistration,
+      config.disableSsoRegistration,
+    );
+  }
 
   console.log("✅ Environment-based configuration initialized successfully");
 }

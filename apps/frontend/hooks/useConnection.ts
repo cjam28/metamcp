@@ -192,11 +192,7 @@ export function useConnection({
         // Handle 401/auth challenges on any request, not just during connect().
         // This covers deferred auth scenarios where the server (e.g. Gusto) accepts
         // initialize but requires auth on tools/list or other protected methods.
-        const shouldRetry = await handleAuthError(e);
-        if (shouldRetry) {
-          // Tokens were already present and valid — retry the request immediately.
-          return makeRequest(request, schema, options);
-        }
+        await handleAuthError(e);
         if (is401Error(e)) {
           // OAuth redirect has been initiated via window.location.href — suppress
           // the toast and rethrow so callers can clean up, but the page will
@@ -760,7 +756,6 @@ export function useConnection({
       const result = await vanillaTrpcClient.frontend.oauth.initiateFlow.mutate(
         {
           mcp_server_uuid: mcpServerUuid,
-          mcp_server_url: url || "",
           redirect_uri: redirectUri,
         },
       );

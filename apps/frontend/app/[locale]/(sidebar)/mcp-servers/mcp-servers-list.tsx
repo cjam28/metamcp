@@ -165,7 +165,8 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
           uuid: row.original.uuid,
         });
         succeeded++;
-      } catch {
+      } catch (err) {
+        console.error(`Failed to delete MCP server ${row.original.uuid}:`, err);
         failed++;
       }
       const done = succeeded + failed;

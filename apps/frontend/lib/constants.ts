@@ -6,6 +6,9 @@ export const SESSION_KEYS = {
   CLIENT_INFORMATION: "mcp_client_information",
   MCP_SERVER_UUID: "mcp_server_uuid",
   SERVER_METADATA: "mcp_server_metadata",
+  // Set before the completeFlow mutation to prevent duplicate calls under
+  // React 18 Strict Mode (which remounts effects, resetting useRef).
+  OAUTH_CALLBACK_PROCESSING: "mcp_oauth_callback_processing",
 } as const;
 
 // Helper function to create server-specific session storage keys

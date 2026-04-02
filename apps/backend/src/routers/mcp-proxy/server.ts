@@ -414,7 +414,7 @@ serverRouter.post("/mcp", async (req, res) => {
             "Received 401 Unauthorized from MCP server:",
             error.message,
           );
-          res.status(401).json(error);
+          res.status(401).json({ message: "Unauthorized", code: 401 });
           return;
         }
 

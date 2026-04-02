@@ -10,13 +10,14 @@ export const JSONRPC_AUTH_CHALLENGE_CODE = -32401;
 
 function isAuthError(error: unknown): boolean {
   if (!error || !(error instanceof Error)) return false;
-  // SseError and StreamableHTTPClientTransport both surface HTTP 401 in code or message
+  // SseError exposes .code; StreamableHTTPClientTransport surfaces 401 in the message.
+  // Avoid broad .toLowerCase().includes("unauthorized") to prevent false positives on
+  // application-level errors that happen to contain that word.
   const hasCode401 =
     "code" in error && (error as { code: number }).code === 401;
   const hasMsg401 =
     error.message.includes("HTTP 401") ||
-    error.message.includes("(HTTP 401)") ||
-    error.message.toLowerCase().includes("unauthorized");
+    error.message.includes("(HTTP 401)");
   return hasCode401 || hasMsg401;
 }
 
@@ -140,7 +141,9 @@ export default function mcpProxy({
           error: {
             code: errorCode,
             message: error.message,
-            data: error,
+            // Serialize only the message string; raw Error objects do not JSON-serialize
+            // cleanly and may expose internal stack traces.
+            data: { message: error.message },
           },
         };
 
