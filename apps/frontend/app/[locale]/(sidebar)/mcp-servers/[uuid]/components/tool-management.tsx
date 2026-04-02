@@ -185,7 +185,7 @@ export function ToolManagement({
             disabled={loading || !makeRequest}
             title={
               !makeRequest
-                ? "Use "Test Live Connection" in the header to enable live sync"
+                ? "Use 'Test Live Connection' in the header to enable live sync"
                 : undefined
             }
           >
