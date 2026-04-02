@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import { toast } from "sonner";
 
 import { EditMcpServer } from "@/components/edit-mcp-server";
@@ -199,26 +199,10 @@ export default function McpServerDetailPage({
     deleteOAuthSessionMutation.mutate({ mcp_server_uuid: uuid });
   };
 
-  // Auto-connect when the hook is enabled and idle. Do not depend on the whole
-  // `connection` object — useConnection returns a new object reference every
-  // render, which re-fired this effect and called connect() multiple times.
-  useEffect(() => {
-    if (
-      !server ||
-      isLoading ||
-      server.error_status === McpServerErrorStatusEnum.Enum.ERROR ||
-      connectionStatus !== "disconnected"
-    ) {
-      return;
-    }
-    void connect();
-  }, [
-    connect,
-    connectionStatus,
-    isLoading,
-    server?.uuid,
-    server?.error_status,
-  ]);
+  // No auto-connect on page load. The backend proxy already maintains a live
+  // connection to this MCP server for real tool calls. The browser-level
+  // connection here is a separate "test" session used only for live tool
+  // inspection — it is opt-in via the "Test Live Connection" button.
 
   // Handle delete server
   const handleDeleteServer = async () => {
@@ -232,12 +216,9 @@ export default function McpServerDetailPage({
     // Toast is handled by the EditMcpServer component
   };
 
-  // Handle manual connect/disconnect
+  // Start / stop the browser-level test connection (opt-in, not auto-started)
   const handleConnectionToggle = () => {
-    if (server?.error_status === McpServerErrorStatusEnum.Enum.ERROR) {
-      // Don't allow connection if server is in error state
-      return;
-    }
+    if (server?.error_status === McpServerErrorStatusEnum.Enum.ERROR) return;
     if (connection.connectionStatus === "connected") {
       connection.disconnect();
     } else {
@@ -491,33 +472,38 @@ export default function McpServerDetailPage({
             )}
           </div>
           <div className="flex-shrink-0">
-            {/* MCP Connection Status - only show if server exists */}
-            {server && (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium whitespace-nowrap">
-                    {t("mcp-servers:detail.mcpConnection")}:
-                  </span>
-                  <ConnectionIcon className="h-4 w-4 flex-shrink-0" />
-                  <span
-                    className={`text-sm font-medium whitespace-nowrap ${connectionInfo.color}`}
-                  >
-                    {connectionInfo.text}
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleConnectionToggle}
-                  disabled={connection.connectionStatus === "connecting"}
-                  className="whitespace-nowrap flex-shrink-0"
-                >
-                  {connection.connectionStatus === "connected"
-                    ? t("mcp-servers:detail.reconnect")
-                    : t("mcp-servers:detail.connect")}
-                </Button>
-              </div>
-            )}
+                {/* Browser-level test connection — separate from the backend proxy */}
+                {server && (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    {connection.connectionStatus !== "disconnected" && (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">
+                          Live test:
+                        </span>
+                        <ConnectionIcon className="h-4 w-4 flex-shrink-0" />
+                        <span
+                          className={`text-sm font-medium whitespace-nowrap ${connectionInfo.color}`}
+                        >
+                          {connectionInfo.text}
+                        </span>
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleConnectionToggle}
+                      disabled={connection.connectionStatus === "connecting"}
+                      className="whitespace-nowrap flex-shrink-0"
+                      title="Opens a direct browser connection for live tool inspection and sync"
+                    >
+                      {connection.connectionStatus === "connected"
+                        ? "Disconnect"
+                        : connection.connectionStatus === "connecting"
+                          ? "Connecting…"
+                          : "Test Live Connection"}
+                    </Button>
+                  </div>
+                )}
           </div>
         </div>
 
@@ -749,7 +735,8 @@ export default function McpServerDetailPage({
           <ServerDetailsSkeleton />
         )}
 
-        {/* Tools Management */}
+        {/* Tools Management — always visible; DB tools load immediately without
+            a live connection. Use "Test Live Connection" to enable live sync. */}
         {server && (
           <div className="rounded-lg border p-6">
             <h3 className="text-lg font-semibold mb-4">
@@ -772,22 +759,15 @@ export default function McpServerDetailPage({
                   </div>
                 </div>
               </div>
-            ) : connection.connectionStatus === "connected" ? (
+            ) : (
               <ToolManagement
                 mcpServerUuid={uuid}
-                makeRequest={connection.makeRequest}
+                makeRequest={
+                  connection.connectionStatus === "connected"
+                    ? connection.makeRequest
+                    : undefined
+                }
               />
-            ) : (
-              <div className="space-y-4">
-                <ToolManagementSkeleton />
-                <div className="flex justify-center">
-                  <div className="text-sm text-muted-foreground">
-                    {connection.connectionStatus === "connecting"
-                      ? t("mcp-servers:detail.connectingToServer")
-                      : t("mcp-servers:detail.connectToManageTools")}
-                  </div>
-                </div>
-              </div>
             )}
           </div>
         )}

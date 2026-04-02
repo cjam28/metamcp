@@ -7,7 +7,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { Tool } from "@repo/zod-types";
 import { AlertTriangle, Database, RefreshCw, Wrench } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -36,7 +36,10 @@ interface ToolsListResponse {
 
 interface ToolManagementProps {
   mcpServerUuid: string;
-  makeRequest: <T extends z.ZodType>(
+  // Optional: only available when a live test connection is active.
+  // When undefined, the component shows DB-stored tools and the live-refresh
+  // button is disabled with a "Test Live Connection first" hint.
+  makeRequest?: <T extends z.ZodType>(
     request: ClientRequest,
     schema: T,
     options?: RequestOptions & { suppressToast?: boolean },
@@ -49,7 +52,6 @@ export function ToolManagement({
 }: ToolManagementProps) {
   const [mcpTools, setMcpTools] = useState<MCPTool[]>([]);
   const [loading, setLoading] = useState(false);
-  const hasInitiallyFetched = useRef(false);
   const { t } = useTranslations();
 
   // Get tRPC utils for cache invalidation
@@ -86,19 +88,16 @@ export function ToolManagement({
     },
   });
 
-  // Fetch tools from MCP server with pagination
+  // Fetch tools live from the MCP server (requires an active test connection)
   const fetchMCPTools = useCallback(async () => {
+    if (!makeRequest) return;
     setLoading(true);
     try {
-      // Paginated tool fetching - load all pages automatically
       const allTools: MCPTool[] = [];
       let cursor: string | undefined = undefined;
       let hasMore = true;
-      let pageCount = 0;
 
       while (hasMore) {
-        pageCount++;
-
         const response = (await makeRequest(
           {
             method: "tools/list" as const,
@@ -119,7 +118,6 @@ export function ToolManagement({
       if (allTools.length > 0) {
         setMcpTools(allTools);
 
-        // Automatically save tools to database
         const toolsToSave = allTools.map((tool) => ({
           name: tool.name,
           description: tool.description || undefined,
@@ -144,14 +142,6 @@ export function ToolManagement({
       setLoading(false);
     }
   }, [makeRequest, mcpServerUuid, saveToolsMutation, t]);
-
-  // Auto-fetch tools when component mounts - but only once
-  useEffect(() => {
-    if (!hasInitiallyFetched.current) {
-      hasInitiallyFetched.current = true;
-      fetchMCPTools();
-    }
-  }, [fetchMCPTools]);
 
   // Calculate tool counts for display
   const mcpToolCount = mcpTools.length;
@@ -192,7 +182,12 @@ export function ToolManagement({
             variant="outline"
             size="sm"
             onClick={fetchMCPTools}
-            disabled={loading}
+            disabled={loading || !makeRequest}
+            title={
+              !makeRequest
+                ? "Use "Test Live Connection" in the header to enable live sync"
+                : undefined
+            }
           >
             <RefreshCw
               className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
