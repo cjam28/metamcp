@@ -4,6 +4,8 @@ import logger from "@/utils/logger";
 
 import { oauthSessionsRepository } from "../../db/repositories/oauth-sessions.repo";
 
+import { refreshOAuthTokensIfExpired } from "./oauth-token-refresh";
+
 /**
  * Environment variables to inherit by default, if an environment is not explicitly given.
  */
@@ -93,12 +95,16 @@ export async function convertDbServerToParams(
     let oauthTokens = null;
 
     if (oauthSession && oauthSession.tokens) {
+      const freshTokens = await refreshOAuthTokensIfExpired(
+        server.uuid,
+        oauthSession,
+      );
       oauthTokens = {
-        access_token: oauthSession.tokens.access_token,
-        token_type: oauthSession.tokens.token_type,
-        expires_in: oauthSession.tokens.expires_in,
-        scope: oauthSession.tokens.scope,
-        refresh_token: oauthSession.tokens.refresh_token,
+        access_token: freshTokens.access_token,
+        token_type: freshTokens.token_type,
+        expires_in: freshTokens.expires_in,
+        scope: freshTokens.scope,
+        refresh_token: freshTokens.refresh_token,
       };
     }
 

@@ -232,6 +232,16 @@ export const oauthImplementations = {
         clientId = existingSession.client_information.client_id;
         clientSecret = existingSession.client_information.client_secret ?? undefined;
         logger.info(`Reusing existing OAuth client_id for ${mcp_server_uuid}`);
+        // Backfill token_endpoint for sessions created before we persisted it (needed for refresh)
+        if (!existingSession.client_information.token_endpoint) {
+          await oauthSessionsRepository.upsert({
+            mcp_server_uuid,
+            client_information: {
+              ...existingSession.client_information,
+              token_endpoint: tokenEndpoint,
+            },
+          });
+        }
       } else if (registrationEndpoint) {
         const regRes = await fetch(registrationEndpoint, {
           method: "POST",
@@ -268,6 +278,7 @@ export const oauthImplementations = {
           mcp_server_uuid,
           client_information: {
             client_id: clientId,
+            token_endpoint: tokenEndpoint,
             ...(clientSecret && { client_secret: clientSecret }),
             ...(regData.client_id_issued_at && {
               client_id_issued_at: regData.client_id_issued_at,
@@ -428,8 +439,11 @@ export const oauthImplementations = {
         scope?: string;
       };
 
+      const existingRefreshToken = session.tokens?.refresh_token;
+
       // Persist tokens and clear the one-time code_verifier JSON.
       // Use !== undefined checks (not truthiness) so that expires_in: 0 is preserved.
+      // Preserve prior refresh_token when the AS omits it on re-authorization (common).
       await oauthSessionsRepository.upsert({
         mcp_server_uuid,
         tokens: {
@@ -439,8 +453,8 @@ export const oauthImplementations = {
             tokenData.expires_in !== null && {
               expires_in: tokenData.expires_in,
             }),
-          ...(tokenData.refresh_token && {
-            refresh_token: tokenData.refresh_token,
+          ...((tokenData.refresh_token ?? existingRefreshToken) && {
+            refresh_token: tokenData.refresh_token ?? existingRefreshToken,
           }),
           ...(tokenData.scope && { scope: tokenData.scope }),
         },

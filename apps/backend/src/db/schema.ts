@@ -91,7 +91,7 @@ export const oauthSessionsTable = pgTable(
       .notNull()
       .references(() => mcpServersTable.uuid, { onDelete: "cascade" }),
     client_information: jsonb("client_information")
-      .$type<OAuthClientInformation>()
+      .$type<OAuthClientInformation & { token_endpoint?: string }>()
       .notNull()
       .default(sql`'{}'::jsonb`),
     tokens: jsonb("tokens").$type<OAuthTokens>(),

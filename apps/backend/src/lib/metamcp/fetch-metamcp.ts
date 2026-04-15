@@ -10,6 +10,7 @@ import logger from "@/utils/logger";
 import { db } from "../../db/index";
 import { oauthSessionsRepository } from "../../db/repositories/index";
 import { mcpServersTable, namespaceServerMappingsTable } from "../../db/schema";
+import { refreshOAuthTokensIfExpired } from "./oauth-token-refresh";
 import { getDefaultEnvironment } from "./utils";
 
 // Define IOType for stderr handling
@@ -73,12 +74,16 @@ export async function getMcpServers(
       let oauthTokens = null;
 
       if (oauthSession && oauthSession.tokens) {
+        const freshTokens = await refreshOAuthTokensIfExpired(
+          server.uuid,
+          oauthSession,
+        );
         oauthTokens = {
-          access_token: oauthSession.tokens.access_token,
-          token_type: oauthSession.tokens.token_type,
-          expires_in: oauthSession.tokens.expires_in,
-          scope: oauthSession.tokens.scope,
-          refresh_token: oauthSession.tokens.refresh_token,
+          access_token: freshTokens.access_token,
+          token_type: freshTokens.token_type,
+          expires_in: freshTokens.expires_in,
+          scope: freshTokens.scope,
+          refresh_token: freshTokens.refresh_token,
         };
       }
 
