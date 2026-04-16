@@ -27,6 +27,7 @@ export class NamespacesRepository {
           name: input.name,
           description: input.description,
           user_id: input.user_id,
+          discovery_mode: input.discovery_mode ?? "EAGER",
         })
         .returning();
 
@@ -78,6 +79,7 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        discovery_mode: namespacesTable.discovery_mode,
       })
       .from(namespacesTable)
       .orderBy(desc(namespacesTable.created_at));
@@ -93,6 +95,7 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        discovery_mode: namespacesTable.discovery_mode,
       })
       .from(namespacesTable)
       .where(
@@ -114,6 +117,7 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        discovery_mode: namespacesTable.discovery_mode,
       })
       .from(namespacesTable)
       .where(isNull(namespacesTable.user_id))
@@ -130,6 +134,7 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        discovery_mode: namespacesTable.discovery_mode,
       })
       .from(namespacesTable)
       .where(eq(namespacesTable.user_id, userId))
@@ -145,6 +150,7 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        discovery_mode: namespacesTable.discovery_mode,
       })
       .from(namespacesTable)
       .where(eq(namespacesTable.uuid, uuid));
@@ -165,6 +171,7 @@ export class NamespacesRepository {
         created_at: namespacesTable.created_at,
         updated_at: namespacesTable.updated_at,
         user_id: namespacesTable.user_id,
+        discovery_mode: namespacesTable.discovery_mode,
       })
       .from(namespacesTable)
       .where(
@@ -296,6 +303,9 @@ export class NamespacesRepository {
           description: input.description,
           user_id: input.user_id,
           updated_at: new Date(),
+          ...(input.discovery_mode !== undefined && {
+            discovery_mode: input.discovery_mode,
+          }),
         })
         .where(eq(namespacesTable.uuid, input.uuid))
         .returning();

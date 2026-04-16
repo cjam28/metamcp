@@ -82,7 +82,8 @@ export default function EndpointsPage() {
           enableOauth: false,
           useQueryParamAuth: false,
           createMcpServer: true,
-          user_id: undefined, // Default to "For myself" (Private)
+          user_id: undefined,
+          discoveryModeOverride: null,
         });
         setSelectedNamespaceUuid("");
         setSelectedNamespaceName("");
@@ -127,7 +128,8 @@ export default function EndpointsPage() {
       enableOauth: false,
       useQueryParamAuth: false,
       createMcpServer: true,
-      user_id: undefined, // Default to "For myself" (Private)
+      user_id: undefined,
+      discoveryModeOverride: null,
     },
   });
 
@@ -152,6 +154,7 @@ export default function EndpointsPage() {
         useQueryParamAuth: data.useQueryParamAuth,
         createMcpServer: data.createMcpServer,
         user_id: data.user_id,
+        discoveryModeOverride: data.discoveryModeOverride,
       };
       console.log("apiPayload", apiPayload);
       // Use tRPC mutation
@@ -196,7 +199,8 @@ export default function EndpointsPage() {
       enableOauth: false,
       useQueryParamAuth: false,
       createMcpServer: true,
-      user_id: undefined, // Default to "For myself" (Private)
+      user_id: undefined,
+      discoveryModeOverride: null,
     });
     setSelectedNamespaceUuid("");
     setSelectedNamespaceName("");
@@ -675,6 +679,38 @@ export default function EndpointsPage() {
                       </p>
                     </div>
                   )}
+                </div>
+
+                {/* Tool Discovery Mode Override */}
+                <div className="space-y-4 border-t pt-4">
+                  <h4 className="text-sm font-medium">Tool Discovery Mode</h4>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium">
+                        Discovery Mode Override
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        Override namespace setting for this endpoint. Inherit =
+                        use namespace default.
+                      </p>
+                    </div>
+                    <select
+                      className="text-sm border rounded px-2 py-1 bg-background"
+                      value={form.watch("discoveryModeOverride") ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        form.setValue(
+                          "discoveryModeOverride",
+                          val === "" ? null : (val as "EAGER" | "LAZY"),
+                        );
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      <option value="">Inherit from namespace</option>
+                      <option value="EAGER">Eager (list all tools)</option>
+                      <option value="LAZY">Lazy (meta-tools only)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-2">

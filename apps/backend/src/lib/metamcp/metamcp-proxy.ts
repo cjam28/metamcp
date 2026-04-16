@@ -39,6 +39,10 @@ import {
   MetaMCPHandlerContext,
 } from "./metamcp-middleware/functional-middleware";
 import {
+  createLazyDiscoveryCallToolMiddleware,
+  createLazyDiscoveryListToolsMiddleware,
+} from "./metamcp-middleware/lazy-discovery.functional";
+import {
   createToolOverridesCallToolMiddleware,
   createToolOverridesListToolsMiddleware,
   mapOverrideNameToOriginal,
@@ -101,6 +105,7 @@ export const createServer = async (
   namespaceUuid: string,
   sessionId: string,
   includeInactiveServers: boolean = false,
+  endpointUuid?: string,
 ) => {
   const toolToClient: Record<string, ConnectedClient> = {};
   const toolToServerUuid: Record<string, string> = {};
@@ -464,28 +469,24 @@ export const createServer = async (
     }
   };
 
-  // Compose middleware with handlers - this is the Express-like functional approach
+  // Compose middleware with handlers - outermost (lazy) → inner (filter/overrides) → handler
   const listToolsWithMiddleware = compose(
+    createLazyDiscoveryListToolsMiddleware({ namespaceUuid, endpointUuid }),
     createToolOverridesListToolsMiddleware({
       cacheEnabled: true,
       persistentCacheOnListTools: true,
     }),
     createFilterListToolsMiddleware({ cacheEnabled: true }),
-    // Add more middleware here as needed
-    // createLoggingMiddleware(),
-    // createRateLimitingMiddleware(),
   )(originalListToolsHandler);
 
   const callToolWithMiddleware = compose(
+    createLazyDiscoveryCallToolMiddleware({ namespaceUuid, endpointUuid }),
     createFilterCallToolMiddleware({
       cacheEnabled: true,
       customErrorMessage: (toolName, reason) =>
         `Access denied to tool "${toolName}": ${reason}`,
     }),
     createToolOverridesCallToolMiddleware({ cacheEnabled: true }),
-    // Add more middleware here as needed
-    // createAuditingMiddleware(),
-    // createAuthorizationMiddleware(),
   )(originalCallToolHandler);
 
   // Set up the handlers with middleware

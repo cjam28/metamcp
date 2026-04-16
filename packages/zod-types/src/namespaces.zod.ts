@@ -7,6 +7,9 @@ import {
 } from "./mcp-servers.zod";
 import { ToolSchema, ToolStatusEnum } from "./tools.zod";
 
+export const DiscoveryModeEnum = z.enum(["EAGER", "LAZY"]);
+export type DiscoveryMode = z.infer<typeof DiscoveryModeEnum>;
+
 const ToolAnnotationsSchema = z.record(z.unknown());
 
 // Namespace schema definitions
@@ -15,6 +18,7 @@ export const createNamespaceFormSchema = z.object({
   description: z.string().optional(),
   mcpServerUuids: z.array(z.string()).optional(),
   user_id: z.string().nullable().optional(),
+  discovery_mode: DiscoveryModeEnum.optional().default("EAGER"),
 });
 
 export type CreateNamespaceFormData = z.infer<typeof createNamespaceFormSchema>;
@@ -24,6 +28,7 @@ export const editNamespaceFormSchema = z.object({
   description: z.string().optional(),
   mcpServerUuids: z.array(z.string()).optional(),
   user_id: z.string().nullable().optional(),
+  discovery_mode: DiscoveryModeEnum.optional(),
 });
 
 export type EditNamespaceFormData = z.infer<typeof editNamespaceFormSchema>;
@@ -33,6 +38,7 @@ export const CreateNamespaceRequestSchema = z.object({
   description: z.string().optional(),
   mcpServerUuids: z.array(z.string()).optional(),
   user_id: z.string().nullable().optional(),
+  discovery_mode: DiscoveryModeEnum.optional().default("EAGER"),
 });
 
 export const NamespaceSchema = z.object({
@@ -42,6 +48,7 @@ export const NamespaceSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   user_id: z.string().nullable(),
+  discovery_mode: DiscoveryModeEnum.default("EAGER"),
 });
 
 // Server within namespace schema - extends McpServerSchema with namespace-specific status
@@ -100,6 +107,7 @@ export const UpdateNamespaceRequestSchema = z.object({
   description: z.string().optional(),
   mcpServerUuids: z.array(z.string()).optional(),
   user_id: z.string().nullable().optional(),
+  discovery_mode: DiscoveryModeEnum.optional(),
 });
 
 export const UpdateNamespaceResponseSchema = z.object({
@@ -236,6 +244,7 @@ export const NamespaceCreateInputSchema = z.object({
   description: z.string().nullable().optional(),
   mcpServerUuids: z.array(z.string()).optional(),
   user_id: z.string().nullable().optional(),
+  discovery_mode: DiscoveryModeEnum.optional().default("EAGER"),
 });
 
 export const NamespaceUpdateInputSchema = z.object({
@@ -244,6 +253,7 @@ export const NamespaceUpdateInputSchema = z.object({
   description: z.string().nullable().optional(),
   mcpServerUuids: z.array(z.string()).optional(),
   user_id: z.string().nullable().optional(),
+  discovery_mode: DiscoveryModeEnum.optional(),
 });
 
 export const NamespaceServerStatusUpdateSchema = z.object({
@@ -289,6 +299,7 @@ export const DatabaseNamespaceSchema = z.object({
   created_at: z.date(),
   updated_at: z.date(),
   user_id: z.string().nullable(),
+  discovery_mode: DiscoveryModeEnum.default("EAGER"),
 });
 
 export const DatabaseNamespaceServerSchema = z.object({

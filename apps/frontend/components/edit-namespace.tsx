@@ -7,6 +7,7 @@ import {
   NamespaceWithServers,
   UpdateNamespaceRequest,
 } from "@repo/zod-types";
+import { Switch } from "@/components/ui/switch";
 import { Check, ChevronDown, Search, Server } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -117,6 +118,7 @@ export function EditNamespace({
       description: "",
       mcpServerUuids: [],
       user_id: undefined,
+      discovery_mode: "EAGER",
     },
   });
 
@@ -131,6 +133,7 @@ export function EditNamespace({
         description: namespace.description || "",
         mcpServerUuids: serverUuids,
         user_id: namespace.user_id,
+        discovery_mode: namespace.discovery_mode ?? "EAGER",
       });
       setSelectedServerUuids(serverUuids);
     }
@@ -162,6 +165,7 @@ export function EditNamespace({
         description: data.description,
         mcpServerUuids: selectedServerUuids,
         user_id: data.user_id,
+        discovery_mode: data.discovery_mode,
       };
 
       // Use tRPC mutation instead of direct fetch
@@ -185,6 +189,7 @@ export function EditNamespace({
       description: "",
       mcpServerUuids: [],
       user_id: undefined,
+      discovery_mode: "EAGER",
     });
     setSelectedServerUuids([]);
   };
@@ -239,6 +244,25 @@ export function EditNamespace({
                   {editForm.formState.errors.description.message}
                 </p>
               )}
+            </div>
+
+            {/* Tool Discovery Mode */}
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <label className="text-sm font-medium">Lazy Tool Discovery</label>
+                <p className="text-xs text-muted-foreground">
+                  {editForm.watch("discovery_mode") === "LAZY"
+                    ? "Lazy: returns 3 meta-tools. The model discovers and calls tools on demand."
+                    : "Eager: all tools listed upfront (default)."}
+                </p>
+              </div>
+              <Switch
+                checked={editForm.watch("discovery_mode") === "LAZY"}
+                onCheckedChange={(checked) =>
+                  editForm.setValue("discovery_mode", checked ? "LAZY" : "EAGER")
+                }
+                disabled={isUpdating}
+              />
             </div>
 
             {/* Namespace Ownership */}

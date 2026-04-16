@@ -89,6 +89,7 @@ export const namespacesImplementations = {
         description: input.description,
         mcpServerUuids: input.mcpServerUuids,
         user_id: effectiveUserId,
+        discovery_mode: input.discovery_mode ?? "EAGER",
       });
 
       // Ensure idle MetaMCP server exists for the new namespace to improve performance
@@ -385,6 +386,7 @@ export const namespacesImplementations = {
         description: input.description,
         user_id: input.user_id,
         mcpServerUuids: input.mcpServerUuids,
+        discovery_mode: input.discovery_mode,
       });
 
       // Invalidate idle MetaMCP server for this namespace since the MCP servers list may have changed

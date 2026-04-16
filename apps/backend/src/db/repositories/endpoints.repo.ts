@@ -29,6 +29,7 @@ export class EndpointsRepository {
         enable_oauth: input.enable_oauth ?? false,
         use_query_param_auth: input.use_query_param_auth ?? false,
         user_id: input.user_id,
+        discovery_mode_override: input.discovery_mode_override ?? null,
       })
       .returning();
 
@@ -58,6 +59,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -86,6 +88,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -123,6 +126,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -134,6 +138,7 @@ export class EndpointsRepository {
           created_at: namespacesTable.created_at,
           updated_at: namespacesTable.updated_at,
           user_id: namespacesTable.user_id,
+          discovery_mode: namespacesTable.discovery_mode,
         },
       })
       .from(endpointsTable)
@@ -172,6 +177,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -201,6 +207,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -230,6 +237,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -241,6 +249,7 @@ export class EndpointsRepository {
           created_at: namespacesTable.created_at,
           updated_at: namespacesTable.updated_at,
           user_id: namespacesTable.user_id,
+          discovery_mode: namespacesTable.discovery_mode,
         },
       })
       .from(endpointsTable)
@@ -272,6 +281,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -304,6 +314,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -315,6 +326,7 @@ export class EndpointsRepository {
           created_at: namespacesTable.created_at,
           updated_at: namespacesTable.updated_at,
           user_id: namespacesTable.user_id,
+          discovery_mode: namespacesTable.discovery_mode,
         },
       })
       .from(endpointsTable)
@@ -346,6 +358,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -379,6 +392,7 @@ export class EndpointsRepository {
         client_max_rate_strategy_key:
           endpointsTable.client_max_rate_strategy_key,
         use_query_param_auth: endpointsTable.use_query_param_auth,
+        discovery_mode_override: endpointsTable.discovery_mode_override,
         created_at: endpointsTable.created_at,
         updated_at: endpointsTable.updated_at,
         user_id: endpointsTable.user_id,
@@ -424,6 +438,10 @@ export class EndpointsRepository {
         client_max_rate_strategy: input.client_max_rate_strategy,
         client_max_rate_strategy_key: input.client_max_rate_strategy_key,
         use_query_param_auth: input.use_query_param_auth,
+        discovery_mode_override:
+          input.discovery_mode_override !== undefined
+            ? input.discovery_mode_override
+            : null,
         user_id: input.user_id,
         updated_at: new Date(),
       })

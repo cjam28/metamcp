@@ -125,6 +125,7 @@ export function EditEndpoint({
       clientMaxRateStrategyKey: "",
       enableOauth: false,
       useQueryParamAuth: false,
+      discoveryModeOverride: null,
     },
   });
 
@@ -146,6 +147,7 @@ export function EditEndpoint({
         clientMaxRateStrategyKey: endpoint.clientMaxRateStrategyKey,
         enableOauth: endpoint.enable_oauth ?? false,
         useQueryParamAuth: endpoint.use_query_param_auth ?? false,
+        discoveryModeOverride: endpoint.discovery_mode_override ?? null,
       });
       setSelectedNamespaceUuid(endpoint.namespace.uuid);
       setSelectedNamespaceName(endpoint.namespace.name);
@@ -186,6 +188,7 @@ export function EditEndpoint({
         clientMaxRateStrategyKey: data.clientMaxRateStrategyKey,
         enableOauth: data.enableOauth,
         useQueryParamAuth: data.useQueryParamAuth,
+        discoveryModeOverride: data.discoveryModeOverride,
       };
       // Use tRPC mutation
       updateEndpointMutation.mutate(apiPayload);
@@ -208,6 +211,7 @@ export function EditEndpoint({
       enableApiKeyAuth: true,
       enableOauth: false,
       useQueryParamAuth: false,
+      discoveryModeOverride: null,
     });
     setSelectedNamespaceUuid("");
     setSelectedNamespaceName("");
@@ -628,6 +632,38 @@ export function EditEndpoint({
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* Tool Discovery Mode Override */}
+            <div className="space-y-4 border-t pt-4">
+              <h4 className="text-sm font-medium">Tool Discovery Mode</h4>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-medium">
+                    Discovery Mode Override
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Override the namespace-level setting for this endpoint only.
+                    Inherit = use namespace setting.
+                  </p>
+                </div>
+                <select
+                  className="text-sm border rounded px-2 py-1 bg-background"
+                  value={editForm.watch("discoveryModeOverride") ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    editForm.setValue(
+                      "discoveryModeOverride",
+                      val === "" ? null : (val as "EAGER" | "LAZY"),
+                    );
+                  }}
+                  disabled={isUpdating}
+                >
+                  <option value="">Inherit from namespace</option>
+                  <option value="EAGER">Eager (list all tools)</option>
+                  <option value="LAZY">Lazy (meta-tools only)</option>
+                </select>
+              </div>
             </div>
           </div>
 

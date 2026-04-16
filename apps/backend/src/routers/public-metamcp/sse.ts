@@ -58,6 +58,7 @@ sseRouter.get(
   async (req, res) => {
     const authReq = req as ApiKeyAuthenticatedRequest;
     const { namespaceUuid, endpointName } = authReq;
+    const endpointUuid = authReq.endpoint?.uuid;
 
     try {
       logger.info(
@@ -76,6 +77,8 @@ sseRouter.get(
       const mcpServerInstance = await metaMcpServerPool.getServer(
         sessionId,
         namespaceUuid,
+        false,
+        endpointUuid,
       );
       if (!mcpServerInstance) {
         throw new Error("Failed to get MetaMCP server instance from pool");

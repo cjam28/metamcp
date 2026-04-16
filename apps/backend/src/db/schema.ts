@@ -1,6 +1,7 @@
 import { OAuthClientInformation } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import {
+  DiscoveryModeEnum,
   McpServerErrorStatusEnum,
   McpServerStatusEnum,
   McpServerTypeEnum,
@@ -30,6 +31,10 @@ export const mcpServerStatusEnum = pgEnum(
 export const mcpServerErrorStatusEnum = pgEnum(
   "mcp_server_error_status",
   McpServerErrorStatusEnum.options,
+);
+export const discoveryModeEnum = pgEnum(
+  "discovery_mode",
+  DiscoveryModeEnum.options,
 );
 
 export const mcpServersTable = pgTable(
@@ -229,6 +234,9 @@ export const namespacesTable = pgTable(
     user_id: text("user_id").references(() => usersTable.id, {
       onDelete: "cascade",
     }),
+    discovery_mode: discoveryModeEnum("discovery_mode")
+      .notNull()
+      .default("EAGER"),
   },
   (table) => [
     index("namespaces_user_id_idx").on(table.user_id),
@@ -265,6 +273,7 @@ export const endpointsTable = pgTable(
     use_query_param_auth: boolean("use_query_param_auth")
       .notNull()
       .default(false),
+    discovery_mode_override: discoveryModeEnum("discovery_mode_override"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

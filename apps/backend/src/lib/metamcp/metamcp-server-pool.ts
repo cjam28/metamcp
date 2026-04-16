@@ -65,6 +65,7 @@ export class MetaMcpServerPool {
     sessionId: string,
     namespaceUuid: string,
     includeInactiveServers: boolean = false,
+    endpointUuid?: string,
   ): Promise<MetaMcpServerInstance | undefined> {
     // Check if we already have an active server for this sessionId
     if (this.activeServers[sessionId]) {
@@ -95,6 +96,7 @@ export class MetaMcpServerPool {
       sessionId,
       namespaceUuid,
       includeInactiveServers,
+      endpointUuid,
     );
     if (!newServer) {
       return undefined;
@@ -121,6 +123,7 @@ export class MetaMcpServerPool {
     sessionId: string,
     namespaceUuid: string,
     includeInactiveServers: boolean = false,
+    endpointUuid?: string,
   ): Promise<MetaMcpServerInstance | undefined> {
     try {
       // Create the MetaMCP server - MCP server pool is pre-warmed during startup
@@ -128,6 +131,7 @@ export class MetaMcpServerPool {
         namespaceUuid,
         sessionId,
         includeInactiveServers,
+        endpointUuid,
       );
 
       return serverInstance;

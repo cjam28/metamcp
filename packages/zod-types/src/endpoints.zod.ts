@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { DatabaseNamespaceSchema, NamespaceSchema } from "./namespaces.zod";
+import {
+  DatabaseNamespaceSchema,
+  DiscoveryModeEnum,
+  NamespaceSchema,
+} from "./namespaces.zod";
 
 // Endpoint schema definitions
 export const createEndpointFormSchema = z.object({
@@ -26,6 +30,7 @@ export const createEndpointFormSchema = z.object({
   useQueryParamAuth: z.boolean(),
   createMcpServer: z.boolean(),
   user_id: z.string().nullable().optional(),
+  discoveryModeOverride: DiscoveryModeEnum.nullable().optional(),
 });
 
 export const editEndpointFormSchema = z.object({
@@ -50,6 +55,7 @@ export const editEndpointFormSchema = z.object({
   enableOauth: z.boolean().optional(),
   useQueryParamAuth: z.boolean().optional(),
   user_id: z.string().nullable().optional(),
+  discoveryModeOverride: DiscoveryModeEnum.nullable().optional(),
 });
 
 export const CreateEndpointRequestSchema = z.object({
@@ -75,6 +81,7 @@ export const CreateEndpointRequestSchema = z.object({
   useQueryParamAuth: z.boolean().default(false),
   createMcpServer: z.boolean().default(true),
   user_id: z.string().nullable().optional(),
+  discoveryModeOverride: DiscoveryModeEnum.nullable().optional(),
 });
 
 export const EndpointSchema = z.object({
@@ -96,6 +103,7 @@ export const EndpointSchema = z.object({
   clientMaxRateStrategyKey: z.string().optional(),
   enable_oauth: z.boolean(),
   use_query_param_auth: z.boolean(),
+  discovery_mode_override: DiscoveryModeEnum.nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
   user_id: z.string().nullable(),
@@ -147,6 +155,7 @@ export const UpdateEndpointRequestSchema = z.object({
   enableOauth: z.boolean().optional(),
   useQueryParamAuth: z.boolean().optional(),
   user_id: z.string().nullable().optional(),
+  discoveryModeOverride: DiscoveryModeEnum.nullable().optional(),
 });
 
 export const UpdateEndpointResponseSchema = z.object({
@@ -201,6 +210,7 @@ export const EndpointCreateInputSchema = z.object({
   enable_oauth: z.boolean().optional().default(false),
   use_query_param_auth: z.boolean().optional().default(false),
   user_id: z.string().nullable().optional(),
+  discovery_mode_override: DiscoveryModeEnum.nullable().optional(),
 });
 
 export const EndpointUpdateInputSchema = z.object({
@@ -220,6 +230,7 @@ export const EndpointUpdateInputSchema = z.object({
   enable_oauth: z.boolean().optional(),
   use_query_param_auth: z.boolean().optional(),
   user_id: z.string().nullable().optional(),
+  discovery_mode_override: DiscoveryModeEnum.nullable().optional(),
 });
 
 export type EndpointCreateInput = z.infer<typeof EndpointCreateInputSchema>;
@@ -242,6 +253,7 @@ export const DatabaseEndpointSchema = z.object({
   client_max_rate_strategy_key: z.string().nullable().optional(),
   enable_oauth: z.boolean(),
   use_query_param_auth: z.boolean(),
+  discovery_mode_override: DiscoveryModeEnum.nullable().optional(),
   created_at: z.date(),
   updated_at: z.date(),
   user_id: z.string().nullable(),

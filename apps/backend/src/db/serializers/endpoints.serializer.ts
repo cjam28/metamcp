@@ -38,6 +38,7 @@ export class EndpointsSerializer {
           : dbEndpoint.client_max_rate_strategy_key,
       enable_oauth: dbEndpoint.enable_oauth,
       use_query_param_auth: dbEndpoint.use_query_param_auth,
+      discovery_mode_override: dbEndpoint.discovery_mode_override ?? null,
       created_at: dbEndpoint.created_at.toISOString(),
       updated_at: dbEndpoint.updated_at.toISOString(),
       user_id: dbEndpoint.user_id,
@@ -82,6 +83,7 @@ export class EndpointsSerializer {
           : dbEndpoint.client_max_rate_strategy_key,
       enable_oauth: dbEndpoint.enable_oauth,
       use_query_param_auth: dbEndpoint.use_query_param_auth,
+      discovery_mode_override: dbEndpoint.discovery_mode_override ?? null,
       created_at: dbEndpoint.created_at.toISOString(),
       updated_at: dbEndpoint.updated_at.toISOString(),
       user_id: dbEndpoint.user_id,
@@ -92,6 +94,7 @@ export class EndpointsSerializer {
         created_at: dbEndpoint.namespace.created_at.toISOString(),
         updated_at: dbEndpoint.namespace.updated_at.toISOString(),
         user_id: dbEndpoint.namespace.user_id,
+        discovery_mode: dbEndpoint.namespace.discovery_mode ?? "EAGER",
       },
     };
   }

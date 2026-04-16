@@ -115,6 +115,7 @@ streamableHttpRouter.post(
   async (req, res) => {
     const authReq = req as ApiKeyAuthenticatedRequest;
     const { namespaceUuid, endpointName } = authReq;
+    const endpointUuid = authReq.endpoint?.uuid;
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
     // Log authentication information for debugging
@@ -138,6 +139,8 @@ streamableHttpRouter.post(
         const mcpServerInstance = await metaMcpServerPool.getServer(
           newSessionId,
           namespaceUuid,
+          false,
+          endpointUuid,
         );
         if (!mcpServerInstance) {
           throw new Error("Failed to get MetaMCP server instance from pool");

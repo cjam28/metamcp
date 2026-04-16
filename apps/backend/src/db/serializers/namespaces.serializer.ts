@@ -16,6 +16,7 @@ export class NamespacesSerializer {
       created_at: dbNamespace.created_at.toISOString(),
       updated_at: dbNamespace.updated_at.toISOString(),
       user_id: dbNamespace.user_id,
+      discovery_mode: dbNamespace.discovery_mode ?? "EAGER",
     };
   }
 
@@ -35,6 +36,7 @@ export class NamespacesSerializer {
       created_at: dbNamespace.created_at.toISOString(),
       updated_at: dbNamespace.updated_at.toISOString(),
       user_id: dbNamespace.user_id,
+      discovery_mode: dbNamespace.discovery_mode ?? "EAGER",
       servers: dbNamespace.servers.map((server) => ({
         uuid: server.uuid,
         name: server.name,

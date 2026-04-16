@@ -86,6 +86,7 @@ export const endpointsImplementations = {
         enable_oauth: input.enableOauth ?? false,
         use_query_param_auth: input.useQueryParamAuth ?? false,
         user_id: effectiveUserId,
+        discovery_mode_override: input.discoveryModeOverride ?? null,
       });
 
       // Create MCP server if requested
@@ -354,6 +355,7 @@ export const endpointsImplementations = {
         client_max_rate_strategy_key: input.clientMaxRateStrategyKey,
         enable_oauth: input.enableOauth,
         use_query_param_auth: input.useQueryParamAuth,
+        discovery_mode_override: input.discoveryModeOverride,
       });
 
       return {
