@@ -16,7 +16,7 @@ import {
   type ListToolsResult,
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, asc, eq, ilike, sql } from "drizzle-orm";
 
 import logger from "@/utils/logger";
 
@@ -42,28 +42,58 @@ export function isMetaTool(toolName: string): boolean {
   return toolName.startsWith(META_TOOL_PREFIX);
 }
 
+/** Prevent user-supplied `%` / `_` from widening ILIKE matches. */
+function sanitizeIlikeToken(token: string): string {
+  return token.replace(/[%_\\]/g, "").trim();
+}
+
+/** Split query into tokens; each token must match (AND) for multi-word search. */
+function tokenizeSearchQuery(raw: string): string[] {
+  return raw
+    .split(/\s+/)
+    .map(sanitizeIlikeToken)
+    .filter((t) => t.length > 0);
+}
+
+/** Short list of input schema property keys to help the model build execute_tool arguments. */
+function summarizeToolSchemaProperties(toolSchema: unknown): string {
+  if (!toolSchema || typeof toolSchema !== "object") return "";
+  const obj = toolSchema as { properties?: Record<string, unknown> };
+  if (!obj.properties || typeof obj.properties !== "object") return "";
+  const keys = Object.keys(obj.properties);
+  if (keys.length === 0) return "";
+  const shown = keys.slice(0, 12);
+  const more = keys.length > shown.length ? " …" : "";
+  return `[${shown.join(", ")}${more}]`;
+}
+
 /** The three meta-tool definitions returned in tools/list when LAZY mode is active. */
 export const META_TOOLS: Tool[] = [
   {
     name: META_TOOL_NAMES.SEARCH_TOOLS,
-    description:
-      "Search the tool index for tools matching a query. Use this to discover available tools before calling them via metamcp__execute_tool.",
+    title: "Search tools (lazy discovery)",
+    description: [
+      "PRIMARY discovery step in lazy mode: search the cached tool catalog for this namespace.",
+      "Matches tool name, description, namespace-specific overrides, and server name/description. Multi-word queries require each word to match somewhere (AND across words).",
+      "Flow: (1) search_tools with task keywords → (2) read lines for exact server + tool names → (3) metamcp__execute_tool. If you need integration names first, call metamcp__list_servers.",
+      "Tips: use task verbs/nouns (e.g. send email, list invoices); try synonyms if no hits; narrow with the optional server filter.",
+    ].join(" "),
     inputSchema: {
       type: "object",
       properties: {
         query: {
           type: "string",
           description:
-            "Search term matched against tool name and description (case-insensitive).",
+            "Keywords or short phrase; whitespace splits into tokens (each token must match). Case-insensitive.",
         },
         server: {
           type: "string",
           description:
-            "Optional: limit results to tools from this server (by server name).",
+            "Optional substring filter on MCP server name (case-insensitive).",
         },
         limit: {
           type: "number",
-          description: "Max number of results to return (default 20, max 100).",
+          description: "Max results (default 20, max 100).",
         },
       },
       required: ["query"],
@@ -71,8 +101,11 @@ export const META_TOOLS: Tool[] = [
   },
   {
     name: META_TOOL_NAMES.LIST_SERVERS,
-    description:
-      "List all MCP servers connected to this namespace, with their names and descriptions.",
+    title: "List MCP servers (lazy discovery)",
+    description: [
+      "Lists upstream MCP servers in this namespace (name and description).",
+      "Use when the user asks what integrations exist, or to copy exact server_name values for metamcp__execute_tool.",
+    ].join(" "),
     inputSchema: {
       type: "object",
       properties: {},
@@ -80,22 +113,27 @@ export const META_TOOLS: Tool[] = [
   },
   {
     name: META_TOOL_NAMES.EXECUTE_TOOL,
-    description:
-      "Execute a tool on a connected MCP server. Use metamcp__search_tools first to find the exact server_name and tool_name. Arguments must match the tool's input schema.",
+    title: "Execute a downstream MCP tool (dispatcher)",
+    description: [
+      "Invokes a real tool on an upstream MCP server — the only way to call non-meta tools in lazy mode.",
+      "server_name and tool_name must match metamcp__search_tools / metamcp__list_servers output (tool_name is the upstream tool id, not metamcp__*).",
+      "arguments must follow that tool's input schema; use search_tools parameter hints when present.",
+    ].join(" "),
     inputSchema: {
       type: "object",
       properties: {
         server_name: {
           type: "string",
-          description: "The exact server name as returned by metamcp__search_tools or metamcp__list_servers.",
+          description:
+            "MCP server name for this namespace (as shown in search_tools / list_servers).",
         },
         tool_name: {
           type: "string",
-          description: "The exact tool name (without the server prefix).",
+          description: "Upstream tools/call name (exact string from search results).",
         },
         arguments: {
           type: "object",
-          description: "Arguments to pass to the tool.",
+          description: "JSON object; keys should match the tool input schema.",
         },
       },
       required: ["server_name", "tool_name"],
@@ -111,20 +149,51 @@ export function buildMetaToolsListResult(): ListToolsResult {
 // Individual meta-tool handlers
 // ---------------------------------------------------------------------------
 
+/** One token must match name, descriptions, overrides, or server fields. */
+function tokenMatchesSql(token: string) {
+  const pat = `%${token}%`;
+  return sql`(
+    ${toolsTable.name} ILIKE ${pat}
+    OR COALESCE(${toolsTable.description}, '') ILIKE ${pat}
+    OR COALESCE(${namespaceToolMappingsTable.override_name}, '') ILIKE ${pat}
+    OR COALESCE(${namespaceToolMappingsTable.override_description}, '') ILIKE ${pat}
+    OR COALESCE(${namespaceToolMappingsTable.override_title}, '') ILIKE ${pat}
+    OR ${mcpServersTable.name} ILIKE ${pat}
+    OR COALESCE(${mcpServersTable.description}, '') ILIKE ${pat}
+  )`;
+}
+
 async function handleSearchTools(
   args: Record<string, unknown>,
   namespaceUuid: string,
 ): Promise<CallToolResult> {
   const query = String(args.query ?? "");
-  const serverFilter = args.server ? String(args.server) : undefined;
+  const serverFilter = args.server
+    ? sanitizeIlikeToken(String(args.server))
+    : undefined;
   const limit = Math.min(Number(args.limit ?? 20), 100);
 
+  const tokens = tokenizeSearchQuery(query);
+  if (tokens.length === 0) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: 'Provide at least one search word in "query" (letters/numbers). Example: "email send" or "unifi client".',
+        },
+      ],
+      isError: true,
+    };
+  }
+
   try {
+    const tokenPredicates = tokens.map((t) => tokenMatchesSql(t));
     const rows = await db
       .select({
-        toolName: toolsTable.name,
-        toolDescription: toolsTable.description,
+        toolName: sql<string>`COALESCE(${namespaceToolMappingsTable.override_name}, ${toolsTable.name})`,
+        toolDescription: sql<string>`COALESCE(${namespaceToolMappingsTable.override_description}, ${namespaceToolMappingsTable.override_title}, ${toolsTable.description}, '')`,
         serverName: mcpServersTable.name,
+        toolSchema: toolsTable.toolSchema,
       })
       .from(toolsTable)
       .innerJoin(
@@ -139,26 +208,26 @@ async function handleSearchTools(
         and(
           eq(namespaceToolMappingsTable.namespace_uuid, namespaceUuid),
           eq(namespaceToolMappingsTable.status, "ACTIVE"),
-          or(
-            ilike(toolsTable.name, `%${query}%`),
-            ilike(toolsTable.description, `%${query}%`),
-          ),
+          ...tokenPredicates,
           serverFilter
             ? ilike(mcpServersTable.name, `%${serverFilter}%`)
             : undefined,
         ),
       )
+      .orderBy(asc(mcpServersTable.name), asc(toolsTable.name))
       .limit(limit);
 
     const text =
       rows.length === 0
-        ? `No tools found matching "${query}".`
-        : rows
-            .map(
-              (r) =>
-                `server: ${r.serverName}  |  tool: ${r.toolName}  |  ${r.toolDescription ?? ""}`,
-            )
-            .join("\n");
+        ? `No tools found for ${tokens.map((t) => `"${t}"`).join(" AND ")}. Try fewer or broader keywords, or use metamcp__list_servers to see integrations.`
+        : [
+            `Matched ${rows.length} tool(s) (tokens: ${tokens.join(", ")}). Lines: server | tool | description | param hints`,
+            ...rows.map((r) => {
+              const hints = summarizeToolSchemaProperties(r.toolSchema);
+              const hintSuffix = hints ? `  |  ${hints}` : "";
+              return `server: ${r.serverName}  |  tool: ${r.toolName}  |  ${r.toolDescription ?? ""}${hintSuffix}`;
+            }),
+          ].join("\n");
 
     return {
       content: [{ type: "text", text }],
@@ -197,9 +266,12 @@ async function handleListServers(
     const text =
       rows.length === 0
         ? "No active servers in this namespace."
-        : rows
-            .map((r) => `${r.name}${r.description ? ` — ${r.description}` : ""}`)
-            .join("\n");
+        : [
+            "Use these exact server names as server_name in metamcp__execute_tool:",
+            ...rows.map((r) =>
+              r.description ? `${r.name} — ${r.description}` : r.name,
+            ),
+          ].join("\n");
 
     return {
       content: [{ type: "text", text }],
