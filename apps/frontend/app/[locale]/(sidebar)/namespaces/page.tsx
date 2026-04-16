@@ -75,6 +75,7 @@ export default function NamespacesPage() {
           name: "",
           description: "",
           user_id: undefined, // Default to "For myself" (Private)
+          discovery_mode: "EAGER",
         });
         setSelectedServerUuids([]);
         setServerSearchQuery("");
@@ -103,6 +104,7 @@ export default function NamespacesPage() {
       description: "",
       mcpServerUuids: [],
       user_id: undefined, // Default to "For myself" (Private)
+      discovery_mode: "EAGER",
     },
   });
 
@@ -115,6 +117,7 @@ export default function NamespacesPage() {
         description: data.description,
         mcpServerUuids: selectedServerUuids,
         user_id: data.user_id,
+        discovery_mode: data.discovery_mode ?? "EAGER",
       };
 
       // Use tRPC mutation
